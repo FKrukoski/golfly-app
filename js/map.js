@@ -170,6 +170,12 @@ window.GolfMap = (function() {
          }
     }
 
+    function setCenter(lat, lng) {
+         if (mapInstance) {
+             mapInstance.setView([lat, lng], 18);
+         }
+    }
+
     function onScorecardMapClick(e) {
          if (targetMarker) mapInstance.removeLayer(targetMarker);
          
@@ -238,6 +244,7 @@ window.GolfMap = (function() {
         isInitialized,
         initScorecardMap,
         loadScorecardGreen,
-        centerOnUser
+        centerOnUser,
+        setCenter
     };
 })();

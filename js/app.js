@@ -129,9 +129,17 @@ const app = (function() {
                       <option value="18" selected>18 Buracos Físicos</option>
                  </select>
 
-                 <button class="primary-card" style="text-align:center;margin-top:16px;background:var(--accent-primary);color:#fff;" onclick="app.startCourseMapping()">
+                 <button class="primary-card" style="text-align:center;margin-top:8px;background:var(--accent-primary);color:#fff;" onclick="app.startCourseMapping()">
                       Iniciar Mapeamento 🗺️
                  </button>
+                 
+                 <div style="border-top:1px solid var(--border-subtle); margin-top:8px; padding-top:16px;">
+                      <label style="font-size:0.9rem; color:var(--text-secondary); margin-bottom:8px; display:block;">[Opcional] Mapeamento Rápido (CSV)</label>
+                      <input type="file" id="course-csv-upload" accept=".csv,.txt" style="display:none;" onchange="app.handleCsvUpload(event)">
+                      <button class="secondary-card" style="text-align:center; width:100%; font-size:0.9rem; padding:12px;" onclick="document.getElementById('course-csv-upload').click()">
+                          Importar Coordenadas via .CSV 📄
+                      </button>
+                 </div>
             </div>
          `;
     }
@@ -245,13 +253,54 @@ const app = (function() {
         
         if (existingData && existingData.points) {
              window.GolfMap.loadPreexistingPoints(existingData.points);
+             if (existingData.points.greenCenter) {
+                 document.getElementById('mapper-lat-input').value = existingData.points.greenCenter.lat;
+                 document.getElementById('mapper-lng-input').value = existingData.points.greenCenter.lng;
+             }
+        } else {
+             document.getElementById('mapper-lat-input').value = "";
+             document.getElementById('mapper-lng-input').value = "";
         }
         
         window.onPointCaptured = function(type) {
+             const points = window.GolfMap.getHoleData();
+             if (points && points.greenCenter) {
+                 document.getElementById('mapper-lat-input').value = points.greenCenter.lat;
+                 document.getElementById('mapper-lng-input').value = points.greenCenter.lng;
+             }
              persistCurrentPointsIntoMemory();
-             // Re-render scroll to update green badge
-             loadMapperHole(currentMappingHoleIdx);
+             
+             // Re-render scroll silently to update green badge
+             loadMapperHoleSilently(currentMappingHoleIdx);
         };
+    }
+
+    function loadMapperHoleSilently(holeNum) {
+        // Just recreate badges
+        const scrollContainer = document.getElementById('mapper-holes-scroll');
+        let html = '';
+        for(let i=1; i<=activeMappingCourse.physicalHoles; i++) {
+             const hasData = activeMappingCourse.holes.find(h => h.number === i && h.points.greenCenter);
+             const badgeColor = i === holeNum ? 'var(--accent-primary)' : (hasData ? '#10B981' : 'var(--bg-glass)');
+             const isSelected = i === holeNum ? 'border:2px solid #fff;' : 'border:none;';
+             
+             html += `<div style="padding:10px 16px; border-radius:12px; background:${badgeColor}; color:white; font-weight:700; cursor:pointer; flex-shrink:0; ${isSelected}" onclick="app.switchMapperHole(${i})">
+                 Buraco ${i}
+             </div>`;
+        }
+        scrollContainer.innerHTML = html;
+    }
+
+    function applyManualCoords() {
+         const lat = parseFloat(document.getElementById('mapper-lat-input').value);
+         const lng = parseFloat(document.getElementById('mapper-lng-input').value);
+         
+         if (!isNaN(lat) && !isNaN(lng)) {
+             window.GolfMap.loadPreexistingPoints({ greenCenter: {lat, lng} });
+             window.GolfMap.setCenter(lat, lng);
+             persistCurrentPointsIntoMemory();
+             loadMapperHoleSilently(currentMappingHoleIdx);
+         }
     }
 
     function switchMapperHole(newHoleNum) {
@@ -289,6 +338,68 @@ const app = (function() {
         }
     }
 
+    async function handleCsvUpload(event) {
+         const file = event.target.files[0];
+         if (!file) return;
+
+         const nameInput = document.getElementById('course-name');
+         const cityInput = document.getElementById('course-city');
+         const formatInput = document.getElementById('course-format');
+         
+         if (!nameInput.value.trim() || !cityInput.value.trim()) {
+             alert('Por favor, informe Nome e Cidade antes de importar.');
+             event.target.value = '';
+             return;
+         }
+
+         const reader = new FileReader();
+         reader.onload = async function(e) {
+             const text = e.target.result;
+             const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+             const phys = parseInt(formatInput.value, 10);
+             
+             activeMappingCourse = {
+                 id: `course_${Date.now()}`,
+                 name: nameInput.value.trim(),
+                 city: cityInput.value.trim(),
+                 physicalHoles: phys,
+                 holes: [],
+                 totalPar: 0
+             };
+
+             for(let i = 0; i < lines.length && i < phys; i++) {
+                 const parts = lines[i].split(/[,;]/);
+                 if (parts.length >= 2) {
+                     const lat = parseFloat(parts[0]);
+                     const lng = parseFloat(parts[1]);
+                     if (!isNaN(lat) && !isNaN(lng)) {
+                         activeMappingCourse.holes.push({
+                             number: i + 1,
+                             points: {
+                                 greenCenter: { lat, lng }
+                             }
+                         });
+                     }
+                 }
+             }
+
+             await db.saveCourse(activeMappingCourse);
+             alert(`Importação lida com sucesso (${activeMappingCourse.holes.length} buracos importados). O editor se abrirá para eventuais correções.`);
+             
+             currentMappingHoleIdx = 1;
+             navigate('view-course-mapper');
+             document.getElementById('mapper-course-name').innerText = activeMappingCourse.name;
+             document.getElementById('mapper-total-holes').innerText = activeMappingCourse.physicalHoles;
+             
+             let centerLatLng = null;
+             if (activeMappingCourse.holes.length > 0) {
+                 centerLatLng = [activeMappingCourse.holes[0].points.greenCenter.lat, activeMappingCourse.holes[0].points.greenCenter.lng];
+             }
+             loadMapperHole(currentMappingHoleIdx, centerLatLng);
+         };
+         reader.readAsText(file);
+    }
+
     // Export public methods
     return {
         init,
@@ -298,7 +409,9 @@ const app = (function() {
         deleteCourseUi,
         switchMapperHole,
         saveMappingProgress,
-        cancelMapping
+        cancelMapping,
+        applyManualCoords,
+        handleCsvUpload
     };
 })();
 

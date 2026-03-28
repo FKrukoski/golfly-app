@@ -98,8 +98,20 @@
                     </p>
                     
                     <!-- Horizontal scrollable holes selector -->
-                    <div id="mapper-holes-scroll" style="display:flex; gap:8px; overflow-x:auto; margin-bottom:16px; padding-bottom:8px;">
+                    <div id="mapper-holes-scroll" style="display:flex; gap:8px; overflow-x:auto; margin-bottom:12px; padding-bottom:8px;">
                          <!-- Injected by JS -->
+                    </div>
+                    
+                    <!-- Lat/Lng micro editor -->
+                    <div style="display:flex; gap:8px; margin-bottom:16px; align-items:flex-end;">
+                        <div style="flex:1; display:flex; flex-direction:column; gap:4px;">
+                            <label style="font-size:0.7rem; color:var(--text-secondary);">LATITUDE</label>
+                            <input type="number" id="mapper-lat-input" step="any" placeholder="-25.00000" style="width:100%; padding:8px 12px; border-radius:8px; background:var(--bg-primary); border:1px solid var(--border-subtle); color:white; font-size:0.9rem;" onblur="app.applyManualCoords()">
+                        </div>
+                        <div style="flex:1; display:flex; flex-direction:column; gap:4px;">
+                            <label style="font-size:0.7rem; color:var(--text-secondary);">LONGITUDE</label>
+                            <input type="number" id="mapper-lng-input" step="any" placeholder="-49.00000" style="width:100%; padding:8px 12px; border-radius:8px; background:var(--bg-primary); border:1px solid var(--border-subtle); color:white; font-size:0.9rem;" onblur="app.applyManualCoords()">
+                        </div>
                     </div>
 
                     <button class="primary-card" id="btn-save-progress" style="width:100%; text-align:center; background:var(--accent-primary); color:#fff;" onclick="app.saveMappingProgress()">
