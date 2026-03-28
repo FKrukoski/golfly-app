@@ -214,47 +214,54 @@ const app = (function() {
     }
 
     function loadMapperHole(holeNum, centerLatLng = null) {
-        document.getElementById('mapper-hole-num').innerText = holeNum;
+        currentMappingHoleIdx = holeNum;
         
-        // Setup Button states
-        document.getElementById('btn-prev-hole').style.opacity = holeNum === 1 ? '0.3' : '1';
-        document.getElementById('btn-next-hole').style.opacity = holeNum === activeMappingCourse.physicalHoles ? '0.3' : '1';
-        
-        document.querySelectorAll('.map-point-btn').forEach(b => b.style.opacity = '1');
+        // Render the horizontal scroll holes
+        const scrollContainer = document.getElementById('mapper-holes-scroll');
+        let html = '';
+        for(let i=1; i<=activeMappingCourse.physicalHoles; i++) {
+             // Check if data exists for hole i to color it differently
+             const hasData = activeMappingCourse.holes.find(h => h.number === i && h.points.greenCenter);
+             const badgeColor = i === holeNum ? 'var(--accent-primary)' : (hasData ? '#10B981' : 'var(--bg-glass)');
+             const isSelected = i === holeNum ? 'border:2px solid #fff;' : 'border:none;';
+             
+             html += `<div style="padding:10px 16px; border-radius:12px; background:${badgeColor}; color:white; font-weight:700; cursor:pointer; flex-shrink:0; ${isSelected}" onclick="app.switchMapperHole(${i})">
+                 Buraco ${i}
+             </div>`;
+        }
+        scrollContainer.innerHTML = html;
 
         if (!window.GolfMap.isInitialized()) {
              window.GolfMap.initMap('course-map-container', centerLatLng || [-23.5505, -46.6333]);
         } else {
-             if (centerLatLng && holeNum === 1) { // Only set center on init or hole 1 if forcing
+             if (centerLatLng && holeNum === 1) { 
                  window.GolfMap.initMap('course-map-container', centerLatLng);
              } else {
                  window.GolfMap.resetHolePoints();
              }
         }
         
-        // Check if there are existing points to render
         const existingData = activeMappingCourse.holes.find(h => h.number === holeNum);
         
-        window.onPointRestored = function(type) {
-             const btn = document.getElementById(`btn-${type}`);
-             if (btn) btn.style.opacity = '0.3';
-        };
-
         if (existingData && existingData.points) {
              window.GolfMap.loadPreexistingPoints(existingData.points);
         }
         
         window.onPointCaptured = function(type) {
-             const btn = document.getElementById(`btn-${type}`);
-             if (btn) btn.style.opacity = '0.3';
+             persistCurrentPointsIntoMemory();
+             // Re-render scroll to update green badge
+             loadMapperHole(currentMappingHoleIdx);
         };
     }
 
+    function switchMapperHole(newHoleNum) {
+        persistCurrentPointsIntoMemory();
+        loadMapperHole(newHoleNum);
+    }
+    
     function persistCurrentPointsIntoMemory() {
         const points = window.GolfMap.getHoleData();
-        // check if empty
-        const hasAny = Object.values(points).some(v => v !== null);
-        if (!hasAny) return;
+        if (!points || !points.greenCenter) return;
 
         let existing = activeMappingCourse.holes.find(h => h.number === currentMappingHoleIdx);
         if (existing) {
@@ -267,32 +274,16 @@ const app = (function() {
         }
     }
 
-    function prevMapperHole() {
-        if (currentMappingHoleIdx > 1) {
-             persistCurrentPointsIntoMemory();
-             currentMappingHoleIdx--;
-             loadMapperHole(currentMappingHoleIdx);
-        }
-    }
-
-    function nextMapperHole() {
-        if (currentMappingHoleIdx < activeMappingCourse.physicalHoles) {
-             persistCurrentPointsIntoMemory();
-             currentMappingHoleIdx++;
-             loadMapperHole(currentMappingHoleIdx);
-        }
-    }
-
     async function saveMappingProgress() {
         persistCurrentPointsIntoMemory();
         await db.saveCourse(activeMappingCourse);
-        alert('Progresso salvo com sucesso!');
+        alert('Progresso salvo com sucesso! O Campo está pronto pra jogo.');
         activeMappingCourse = null;
         navigate('view-courses');
     }
 
     function cancelMapping() {
-        if(confirm('Tem certeza? O campo não será salvo.')) {
+        if(confirm('Tem certeza? Suas edições não salvas do buraco atual serão perdidas.')) {
             activeMappingCourse = null;
             navigate('view-courses');
         }
@@ -305,8 +296,7 @@ const app = (function() {
         startCourseMapping,
         resumeCourseMapping,
         deleteCourseUi,
-        prevMapperHole,
-        nextMapperHole,
+        switchMapperHole,
         saveMappingProgress,
         cancelMapping
     };

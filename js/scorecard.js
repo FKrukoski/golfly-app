@@ -118,14 +118,21 @@ window.ScorecardApp = (function() {
 
          // Update map if visible
          if (isMapVisible && window.GolfMap) {
-             window.GolfMap.loadHoleGPS(activeMatchState.courseId, activeMatchState.currentHole);
+             const course = await db.getCourse(activeMatchState.courseId);
+             if (course && course.holes) {
+                  const holeData = course.holes.find(h => h.number === activeMatchState.currentHole);
+                  if (holeData && holeData.points && holeData.points.greenCenter) {
+                       window.GolfMap.loadScorecardGreen(holeData.points.greenCenter.lat, holeData.points.greenCenter.lng);
+                  }
+             }
+             window.GolfMap.centerOnUser();
          }
 
          renderScoreCounters();
          app.navigate('view-scorecard');
     }
 
-    function toggleGpsMap() {
+    async function toggleGpsMap() {
          const mapContainer = document.getElementById('scorecard-map-container');
          isMapVisible = !isMapVisible;
          if (isMapVisible) {
@@ -133,7 +140,17 @@ window.ScorecardApp = (function() {
              if (!window.GolfMap.isInitialized()) {
                   window.GolfMap.initScorecardMap('scorecard-map-container');
              }
-             window.GolfMap.loadHoleGPS(activeMatchState.courseId, activeMatchState.currentHole);
+             
+             // Extract green data to plot the auto-rotating HUD target
+             const course = await db.getCourse(activeMatchState.courseId);
+             if (course && course.holes) {
+                  const holeData = course.holes.find(h => h.number === activeMatchState.currentHole);
+                  if (holeData && holeData.points && holeData.points.greenCenter) {
+                       window.GolfMap.loadScorecardGreen(holeData.points.greenCenter.lat, holeData.points.greenCenter.lng);
+                  }
+             }
+
+             window.GolfMap.centerOnUser();
          } else {
              mapContainer.style.display = 'none';
          }

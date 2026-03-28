@@ -7,20 +7,17 @@ window.GolfMap = (function() {
     let mapInstance = null;
     let markers = {};
     let currentHolePoints = {
-        tee1: null,
-        tee2: null,
-        greenTop: null,
-        greenBottom: null,
-        greenLeft: null,
-        greenRight: null
+        greenCenter: null
     };
     
     // Configurable state
-    let activePointType = null; // Which point is the user currently placing?
+    let activePointType = 'greenCenter'; // Always Green Center now
 
     let userLocation = null;
     let locationWatchId = null;
     let targetMarker = null;
+    let scorecardGreenCenter = null;
+    let layupPolyline = null;
 
     function initMap(containerId, initialCenter = [-23.5505, -46.6333]) {
         setupLeaflet(containerId, initialCenter);
@@ -64,46 +61,20 @@ window.GolfMap = (function() {
         resetHolePoints();
         if (!pointsObj) return;
 
-        Object.keys(pointsObj).forEach(type => {
-            if(pointsObj[type] && pointsObj[type].lat && pointsObj[type].lng) {
-                 currentHolePoints[type] = { lat: pointsObj[type].lat, lng: pointsObj[type].lng };
-                 drawMarker(type, L.latLng(pointsObj[type].lat, pointsObj[type].lng));
-                 
-                 // Mark button as captured if UI is listening
-                 if (window.onPointRestored) {
-                     window.onPointRestored(type);
-                 }
-            }
-        });
-
-        if (isGreenComplete()) {
-            drawGreenCenter();
+        if (pointsObj.greenCenter && pointsObj.greenCenter.lat) {
+             currentHolePoints.greenCenter = { lat: pointsObj.greenCenter.lat, lng: pointsObj.greenCenter.lng };
+             drawMarker('greenCenter', L.latLng(pointsObj.greenCenter.lat, pointsObj.greenCenter.lng));
         }
     }
 
     function onEditorMapClick(e) {
-        if (!activePointType) {
-            alert("Selecione qual ponto deseja marcar primeiro.");
-            return;
-        }
-
         const latLng = e.latlng;
         
-        // Save coordinates
-        currentHolePoints[activePointType] = { lat: latLng.lat, lng: latLng.lng };
+        currentHolePoints.greenCenter = { lat: latLng.lat, lng: latLng.lng };
+        drawMarker('greenCenter', latLng);
         
-        // Draw Maker
-        drawMarker(activePointType, latLng);
-        
-        // Check if green is complete to draw the center
-        if (activePointType.startsWith('green') && isGreenComplete()) {
-            drawGreenCenter();
-        }
-        
-        // Notify UI that a point was captured
         if (window.onPointCaptured) {
-            window.onPointCaptured(activePointType);
-            activePointType = null; // reset
+            window.onPointCaptured('greenCenter');
         }
     }
 
@@ -112,95 +83,26 @@ window.GolfMap = (function() {
             mapInstance.removeLayer(markers[type]);
         }
         
-        let color = '#3B82F6'; // Blue
-        if (type.startsWith('tee')) color = '#F59E0B'; // Orange
-        if (type.startsWith('green')) color = '#10B981'; // Green
-        
-        const myCustomColour = color;
-        const markerHtmlStyles = `
-          background-color: ${myCustomColour};
-          width: 1rem;
-          height: 1rem;
-          display: block;
-          left: -0.5rem;
-          top: -0.5rem;
-          position: relative;
-          border-radius: 1rem 1rem 0;
-          transform: rotate(45deg);
-          border: 2px solid #FFFFFF`;
-
         const icon = L.divIcon({
-          className: "my-custom-pin",
-          iconAnchor: [0, 8],
-          labelAnchor: [-2, 0],
-          popupAnchor: [0, -10],
-          html: `<span style="${markerHtmlStyles}" />`
+            className: "center-pin",
+            html: `<div style="background:#10B981;width:18px;height:18px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 10px rgba(16, 185, 129,0.8);"></div>`,
+            iconAnchor: [9, 9]
         });
 
         markers[type] = L.marker(latLng, { icon: icon, draggable: true }).addTo(mapInstance);
         
-        // Listen to Drag
         markers[type].on('dragend', function(e) {
             const newPos = markers[type].getLatLng();
             currentHolePoints[type] = { lat: newPos.lat, lng: newPos.lng };
-            
-            // Re-draw green center if a green point was moved and all 4 exist
-            if (type.startsWith('green') && isGreenComplete()) {
-                drawGreenCenter();
+            if (window.onPointCaptured) {
+                window.onPointCaptured('greenCenter');
             }
         });
     }
-    
-    function isGreenComplete() {
-         return currentHolePoints.greenTop && 
-                currentHolePoints.greenBottom && 
-                currentHolePoints.greenLeft && 
-                currentHolePoints.greenRight;
-    }
-
-    function drawGreenCenter() {
-         const pts = [
-             currentHolePoints.greenTop,
-             currentHolePoints.greenBottom,
-             currentHolePoints.greenLeft,
-             currentHolePoints.greenRight
-         ];
-         
-         // Calculate simple centroid map bounds
-         const lats = pts.map(p => p.lat);
-         const lngs = pts.map(p => p.lng);
-         
-         const centerLat = (Math.min(...lats) + Math.max(...lats)) / 2;
-         const centerLng = (Math.min(...lngs) + Math.max(...lngs)) / 2;
-         
-         const centerLatLng = [centerLat, centerLng];
-         
-         if (markers['greenCenter']) {
-             mapInstance.removeLayer(markers['greenCenter']);
-         }
-         
-         // Draw a red star or dot for center
-         const icon = L.divIcon({
-             className: "center-pin",
-             html: `<div style="background:#EF4444;width:12px;height:12px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 10px rgba(239,68,68,0.8);"></div>`,
-             iconAnchor: [6, 6]
-         });
-         
-         markers['greenCenter'] = L.marker(centerLatLng, { icon }).addTo(mapInstance);
-         currentHolePoints.greenCenter = { lat: centerLat, lng: centerLng };
-         
-         // Also draw a polygon connecting the 4 points just for visual feedback
-         if (markers['greenPoly']) mapInstance.removeLayer(markers['greenPoly']);
-         markers['greenPoly'] = L.polygon([
-             [currentHolePoints.greenTop.lat, currentHolePoints.greenTop.lng],
-             [currentHolePoints.greenRight.lat, currentHolePoints.greenRight.lng],
-             [currentHolePoints.greenBottom.lat, currentHolePoints.greenBottom.lng],
-             [currentHolePoints.greenLeft.lat, currentHolePoints.greenLeft.lng]
-         ], { color: '#10B981', fillOpacity: 0.2 }).addTo(mapInstance);
-    }
 
     function setActivePointType(type) {
-        activePointType = type;
+        // No longer needed but kept for signature backward compatibility
+        activePointType = 'greenCenter';
     }
 
     function getHoleData() {
@@ -228,9 +130,19 @@ window.GolfMap = (function() {
          mapInstance.on('click', onScorecardMapClick);
     }
 
-    function loadHoleGPS(courseId, holeNum) {
-         // In MVP we don't have hole coords persisted robustly yet, we center on user
-         centerOnUser();
+    function loadScorecardGreen(lat, lng) {
+         scorecardGreenCenter = L.latLng(lat, lng);
+         if (markers['scorecardGreen']) mapInstance.removeLayer(markers['scorecardGreen']);
+         
+         const icon = L.divIcon({
+             className: "green-pin-target",
+             html: `🎯`,
+             iconSize: [24,24],
+             iconAnchor: [12, 12]
+         });
+         
+         markers['scorecardGreen'] = L.marker(scorecardGreenCenter, { icon }).addTo(mapInstance);
+         updateDistanceHUD();
     }
 
     function updateUserLocation(lat, lng) {
@@ -241,8 +153,8 @@ window.GolfMap = (function() {
          
          const userIcon = L.divIcon({
              className: "user-loc-pin",
-             html: `<div style="background:#3B82F6;width:14px;height:14px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 16px rgba(59,130,246,0.8);"></div>`,
-             iconAnchor: [7, 7]
+             html: `<div style="background:#3B82F6;width:16px;height:16px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 16px rgba(59,130,246,0.8);"></div>`,
+             iconAnchor: [8, 8]
          });
          
          markers['user'] = L.marker(latlng, { icon: userIcon }).addTo(mapInstance);
@@ -252,6 +164,7 @@ window.GolfMap = (function() {
     function centerOnUser() {
          if (userLocation && mapInstance) {
              mapInstance.setView(userLocation, 18);
+             updateDistanceHUD(); // Re-trigger rotate
          } else {
              alert('Aguardando sinal GPS...');
          }
@@ -262,26 +175,57 @@ window.GolfMap = (function() {
          
          targetMarker = L.marker(e.latlng, {
               icon: L.divIcon({
-                  html: '🎯',
-                  iconSize: [24,24],
-                  className: 'target-pin',
-                  iconAnchor: [12,12]
+                  html: '<div style="background:#F59E0B;width:12px;height:12px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 10px rgba(245, 158, 11,0.8);"></div>',
+                  iconAnchor: [6,6]
               })
          }).addTo(mapInstance);
          
          updateDistanceHUD();
     }
 
+    function calculateBearing(startLat, startLng, destLat, destLng) {
+      const startLatR = startLat * Math.PI / 180;
+      const startLngR = startLng * Math.PI / 180;
+      const destLatR = destLat * Math.PI / 180;
+      const destLngR = destLng * Math.PI / 180;
+      
+      const y = Math.sin(destLngR - startLngR) * Math.cos(destLatR);
+      const x = Math.cos(startLatR) * Math.sin(destLatR) -
+                Math.sin(startLatR) * Math.cos(destLatR) * Math.cos(destLngR - startLngR);
+      const brng = Math.atan2(y, x);
+      return (brng * 180 / Math.PI + 360) % 360;
+    }
+
     function updateDistanceHUD() {
-         if (!userLocation || !targetMarker) return;
+         if (!userLocation || !scorecardGreenCenter) return;
          
-         const from = L.latLng(userLocation[0], userLocation[1]);
-         const to = targetMarker.getLatLng();
+         const userL = L.latLng(userLocation[0], userLocation[1]);
          
-         const distMeters = from.distanceTo(to);
-         const distYards = Math.round(distMeters * 1.09361);
+         // Auto Rotate logic
+         if (mapInstance && typeof mapInstance.setBearing === 'function') {
+             const bearing = calculateBearing(userL.lat, userL.lng, scorecardGreenCenter.lat, scorecardGreenCenter.lng);
+             mapInstance.setBearing(bearing);
+         }
+
+         if (layupPolyline) mapInstance.removeLayer(layupPolyline);
+
+         if (!targetMarker) {
+             const distToGreen = Math.round(userL.distanceTo(scorecardGreenCenter) * 1.09361);
+             document.getElementById('gps-distance-hud').innerHTML = `🚩 Para o Green: <b>${distToGreen} yds</b>`;
+             document.getElementById('gps-distance-hud').style.display = 'block';
+             
+             layupPolyline = L.polyline([userL, scorecardGreenCenter], {color: '#10B981', weight: 4, opacity: 0.8}).addTo(mapInstance);
+             return;
+         }
          
-         document.getElementById('gps-yards').innerText = distYards;
+         // Layup Logic
+         const layupL = targetMarker.getLatLng();
+         const layupYds = Math.round(userL.distanceTo(layupL) * 1.09361);
+         const restYds = Math.round(layupL.distanceTo(scorecardGreenCenter) * 1.09361);
+         
+         layupPolyline = L.polyline([userL, layupL, scorecardGreenCenter], {color: '#F59E0B', weight: 4, dashArray: '8, 8'}).addTo(mapInstance);
+
+         document.getElementById('gps-distance-hud').innerHTML = `L: <b>${layupYds}y</b> | 🚩: <b>${restYds}y</b>`;
          document.getElementById('gps-distance-hud').style.display = 'block';
     }
 
@@ -293,7 +237,7 @@ window.GolfMap = (function() {
         loadPreexistingPoints,
         isInitialized,
         initScorecardMap,
-        loadHoleGPS,
+        loadScorecardGreen,
         centerOnUser
     };
 })();
