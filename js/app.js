@@ -248,15 +248,12 @@ const app = (function() {
                  window.GolfMap.resetHolePoints();
              }
         }
+        window.GolfMap.loadMapContext(activeMappingCourse.holes, holeNum);
         
         const existingData = activeMappingCourse.holes.find(h => h.number === holeNum);
-        
-        if (existingData && existingData.points) {
-             window.GolfMap.loadPreexistingPoints(existingData.points);
-             if (existingData.points.greenCenter) {
-                 document.getElementById('mapper-lat-input').value = existingData.points.greenCenter.lat;
-                 document.getElementById('mapper-lng-input').value = existingData.points.greenCenter.lng;
-             }
+        if (existingData && existingData.points && existingData.points.greenCenter) {
+             document.getElementById('mapper-lat-input').value = existingData.points.greenCenter.lat;
+             document.getElementById('mapper-lng-input').value = existingData.points.greenCenter.lng;
         } else {
              document.getElementById('mapper-lat-input').value = "";
              document.getElementById('mapper-lng-input').value = "";
@@ -296,9 +293,17 @@ const app = (function() {
          const lng = parseFloat(document.getElementById('mapper-lng-input').value);
          
          if (!isNaN(lat) && !isNaN(lng)) {
-             window.GolfMap.loadPreexistingPoints({ greenCenter: {lat, lng} });
+             // Forcefully push to our memory list
+             let existing = activeMappingCourse.holes.find(h => h.number === currentMappingHoleIdx);
+             const fixedPoints = { greenCenter: {lat, lng} };
+             if (existing) {
+                 existing.points = fixedPoints;
+             } else {
+                 activeMappingCourse.holes.push({ number: currentMappingHoleIdx, points: fixedPoints });
+             }
+             
+             window.GolfMap.loadMapContext(activeMappingCourse.holes, currentMappingHoleIdx);
              window.GolfMap.setCenter(lat, lng);
-             persistCurrentPointsIntoMemory();
              loadMapperHoleSilently(currentMappingHoleIdx);
          }
     }
@@ -313,12 +318,15 @@ const app = (function() {
         if (!points || !points.greenCenter) return;
 
         let existing = activeMappingCourse.holes.find(h => h.number === currentMappingHoleIdx);
+        // Disconnect reference to prevent mutation across holes!
+        const pointsClone = JSON.parse(JSON.stringify(points));
+        
         if (existing) {
-             existing.points = points;
+             existing.points = pointsClone;
         } else {
              activeMappingCourse.holes.push({
                  number: currentMappingHoleIdx,
-                 points: points
+                 points: pointsClone
              });
         }
     }

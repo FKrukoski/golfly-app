@@ -57,14 +57,34 @@ window.GolfMap = (function() {
         markers = {};
     }
 
-    function loadPreexistingPoints(pointsObj) {
+    function loadMapContext(holesArray, activeHoleNum) {
         resetHolePoints();
-        if (!pointsObj) return;
+        if (!holesArray) return;
 
-        if (pointsObj.greenCenter && pointsObj.greenCenter.lat) {
-             currentHolePoints.greenCenter = { lat: pointsObj.greenCenter.lat, lng: pointsObj.greenCenter.lng };
-             drawMarker('greenCenter', L.latLng(pointsObj.greenCenter.lat, pointsObj.greenCenter.lng));
-        }
+        holesArray.forEach(hole => {
+            if (hole.points && hole.points.greenCenter && hole.points.greenCenter.lat) {
+                const latLng = L.latLng(hole.points.greenCenter.lat, hole.points.greenCenter.lng);
+                
+                if (hole.number === activeHoleNum) {
+                    // This is the active hole being mapped (Green Draggable Marker)
+                    currentHolePoints.greenCenter = { lat: latLng.lat, lng: latLng.lng };
+                    drawMarker('greenCenter', latLng);
+                } else {
+                    // Draw a static ghost marker for already mapped holes
+                    drawStaticMarker(hole.number, latLng);
+                }
+            }
+        });
+    }
+
+    function drawStaticMarker(num, latLng) {
+        const icon = L.divIcon({
+            className: "ghost-pin",
+            html: `<div style="background:#4B5563;width:24px;height:24px;border-radius:50%;border:2px solid #fff;display:flex;align-items:center;justify-content:center;color:white;font-size:12px;font-weight:bold;box-shadow:0 0 8px rgba(0,0,0,0.5);">${num}</div>`,
+            iconAnchor: [12, 12]
+        });
+        const m = L.marker(latLng, { icon: icon, draggable: false }).addTo(mapInstance);
+        markers[`ghost_${num}`] = m;
     }
 
     function onEditorMapClick(e) {
@@ -240,7 +260,7 @@ window.GolfMap = (function() {
         setActivePointType,
         getHoleData,
         resetHolePoints,
-        loadPreexistingPoints,
+        loadMapContext,
         isInitialized,
         initScorecardMap,
         loadScorecardGreen,
