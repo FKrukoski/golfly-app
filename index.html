@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Golf Tracker MVP</title>
+    
+    <!-- PWA Settings -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#3B82F6">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="https://raw.githubusercontent.com/google/material-design-icons/master/png/maps/golf_course/materialicons/24dp/2x/baseline_golf_course_black_24dp.png">
+    <!-- Premium Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@500;700&display=swap" rel="stylesheet">
+    
+    <!-- Leaflet for Maps -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    
+    <link rel="stylesheet" href="css/style.css">
+    <!-- Localforage for better IndexedDB handling -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    
+    <!-- Leaflet Rotate Plugin (For Touch and Shift+Mouse Rotation) -->
+    <script src="https://unpkg.com/leaflet-rotate@0.2.8/dist/leaflet-rotate-src.js"></script>
+</head>
+<body>
+    <div id="app-container">
+        <!-- Header -->
+        <header class="top-nav">
+            <h1 class="logo">Golfly</h1>
+            <button id="nav-menu-btn" class="icon-btn">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+            </button>
+        </header>
+
+        <!-- Main Content Area -->
+        <main id="main-content">
+            <!-- Navigation Home View -->
+            <section id="view-home" class="view active">
+                <div class="hero-section">
+                    <h2>Pronto para jogar?</h2>
+                    <p>Gerencie seus campos, acompanhe seus jogos e analise suas estatísticas.</p>
+                </div>
+                
+                <div class="action-grid">
+                    <button class="primary-card" onclick="app.navigate('view-new-match')">
+                        <div class="card-icon">⛳</div>
+                        <h3>Nova Partida</h3>
+                        <p>Iniciar jogo e marcar pontos</p>
+                    </button>
+                    
+                    <button class="secondary-card" onclick="app.navigate('view-courses')">
+                        <div class="card-icon">🗺️</div>
+                        <h3>Campos</h3>
+                        <p>Gerenciar campos e mapas</p>
+                    </button>
+                    
+                    <button class="secondary-card" onclick="app.navigate('view-history')">
+                        <div class="card-icon">📊</div>
+                        <h3>Histórico</h3>
+                        <p>Partidas anteriores e stats</p>
+                    </button>
+                </div>
+            </section>
+
+            <!-- Other views will be dynamically loaded or shown/hidden here -->
+            <section id="view-courses" class="view hidden">
+                <div class="view-header">
+                    <button class="icon-btn back-btn" onclick="app.navigate('view-home')">⬅</button>
+                    <h2>Meus Campos</h2>
+                </div>
+                <div class="list-container" id="courses-list">
+                    <!-- Dynamic List -->
+                </div>
+                <button class="fab-btn" onclick="app.navigate('view-course-editor')">+</button>
+            </section>            <section id="view-course-editor" class="view hidden">
+                 <!-- Course Editor UI (Form injected by JS) -->
+            </section>
+            
+            <section id="view-course-mapper" class="view hidden" style="height: 100vh; position: absolute; top:0; left:0; width:100%; z-index:2000; background:var(--bg-primary);">
+                <div class="view-header" style="position:absolute; top:0; width:100%; z-index:2001; background:var(--bg-glass); backdrop-filter:blur(8px); padding:16px 24px;">
+                    <button class="icon-btn back-btn" onclick="app.cancelMapping()">⬅</button>
+                    <div>
+                        <h2 id="mapper-course-name" style="margin-left:8px;font-size:1.2rem;">Nome do Campo</h2>
+                        <p style="margin-left:8px;color:var(--text-secondary);font-size:0.875rem;">Mapeando Buraco <span id="mapper-hole-num">1</span> de <span id="mapper-total-holes">18</span></p>
+                    </div>
+                </div>
+
+                <div id="course-map-container" style="width:100%; height:100%;"></div>
+
+                <div style="position:absolute; bottom:0; width:100%; z-index:2001; background:var(--bg-secondary); padding:24px; border-top-left-radius:24px; border-top-right-radius:24px; box-shadow:0 -4px 24px rgba(0,0,0,0.5);">
+                    <p style="font-size:0.875rem; color:var(--text-secondary); margin-bottom:12px; text-align:center;" id="mapper-instruction">
+                        Selecione o tipo de ponto abaixo e toque no mapa georreferenciado para fixá-lo.
+                    </p>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:16px;">
+                        <button class="secondary-card map-point-btn" id="btn-pt-tee1" onclick="window.GolfMap.setActivePointType('tee1')" style="padding:12px; text-align:center; font-size:0.9rem;">🟡 Tee 1</button>
+                        <button class="secondary-card map-point-btn" id="btn-pt-tee2" onclick="window.GolfMap.setActivePointType('tee2')" style="padding:12px; text-align:center; font-size:0.9rem;">🟠 Tee Ref</button>
+                        <button class="secondary-card map-point-btn" id="btn-pt-greenTop" onclick="window.GolfMap.setActivePointType('greenTop')" style="padding:12px; text-align:center; font-size:0.9rem;">🟢 Green Distante</button>
+                        <button class="secondary-card map-point-btn" id="btn-pt-greenBottom" onclick="window.GolfMap.setActivePointType('greenBottom')" style="padding:12px; text-align:center; font-size:0.9rem;">🟢 Green Próximo</button>
+                        <button class="secondary-card map-point-btn" id="btn-pt-greenLeft" onclick="window.GolfMap.setActivePointType('greenLeft')" style="padding:12px; text-align:center; font-size:0.9rem;">🟢 Green Esquerda</button>
+                        <button class="secondary-card map-point-btn" id="btn-pt-greenRight" onclick="window.GolfMap.setActivePointType('greenRight')" style="padding:12px; text-align:center; font-size:0.9rem;">🟢 Green Direita</button>
+                    </div>
+                    <div style="display:flex; gap:8px;">
+                        <button class="secondary-card" id="btn-prev-hole" style="flex:1; text-align:center;" onclick="app.prevMapperHole()">
+                            ⬅ Anterior
+                        </button>
+                        <button class="secondary-card" id="btn-next-hole" style="flex:1; text-align:center;" onclick="app.nextMapperHole()">
+                            Próximo ➡
+                        </button>
+                    </div>
+                    <button class="primary-card" id="btn-save-progress" style="width:100%; text-align:center; background:var(--accent-primary); color:#fff; margin-top:12px;" onclick="app.saveMappingProgress()">
+                        Salvar BURACO e Fechar
+                    </button>
+                </div>
+            </section>
+            
+            <section id="view-new-match" class="view hidden">
+                <div class="view-header">
+                    <button class="icon-btn back-btn" onclick="app.navigate('view-home')">⬅</button>
+                    <h2>Nova Partida</h2>
+                </div>
+                <div class="form-group" style="display:flex;flex-direction:column;gap:16px;">
+                    <label>Selecione o Campo</label>
+                    <select id="match-course-select" style="padding:16px;border-radius:12px;background:var(--bg-secondary);color:white;border:1px solid var(--border-subtle);font-size:1rem;">
+                        <option value="">Carregando...</option>
+                    </select>
+
+                    <label style="margin-top:16px;">Modo de Jogo</label>
+                    <select id="match-balls-multiplier" style="padding:16px;border-radius:12px;background:var(--bg-secondary);color:white;border:1px solid var(--border-subtle);font-size:1rem;">
+                        <option value="1">Normal (1 Bola por Jogador)</option>
+                        <option value="2">2 Bolas Simultâneas por Jogador</option>
+                        <option value="3">3 Bolas Simultâneas por Jogador</option>
+                    </select>
+
+                    <label style="margin-top:16px;">Jogadores & Handcap</label>
+                    <div id="players-list" style="display:flex;flex-direction:column;gap:8px;"></div>
+                    
+                    <div style="display:flex;gap:8px;margin-top:8px;">
+                        <input type="text" id="new-player-name" placeholder="Nome do Jogador" style="flex:2;padding:12px;border-radius:12px;background:var(--bg-secondary);border:1px solid var(--border-subtle);color:white;" />
+                        <input type="number" id="new-player-hcp" placeholder="HCP (ex: 12)" style="flex:1;padding:12px;border-radius:12px;background:var(--bg-secondary);border:1px solid var(--border-subtle);color:white;" />
+                        <button onclick="ScorecardApp.addPlayer()" style="background:var(--accent-primary);color:white;border:none;padding:0 20px;border-radius:12px;font-weight:600;">Add</button>
+                    </div>
+
+                    <button class="primary-card" style="text-align:center;margin-top:24px;background:var(--accent-primary);color:#fff;" onclick="ScorecardApp.startMatch()">
+                        Iniciar Partida
+                    </button>
+                </div>
+            </section>
+
+            <section id="view-scorecard" class="view hidden">
+                <div class="view-header" style="justify-content:space-between;display:flex;">
+                    <div style="display:flex;align-items:center;">
+                        <button class="icon-btn back-btn" onclick="ScorecardApp.confirmFinishMatch()">⬅</button>
+                        <div style="margin-left:12px;">
+                            <h2 id="scorecard-course-name" style="margin-left:0;font-size:1.2rem;">Campo</h2>
+                            <p style="color:var(--text-secondary);font-size:0.875rem;">Buraco <span id="current-hole-num">1</span> <span id="current-hole-par-label"></span></p>
+                        </div>
+                    </div>
+                    <button class="icon-btn" onclick="ScorecardApp.toggleGpsMap()" style="background:var(--accent-primary);color:white;border-radius:8px;padding:6px 12px;font-size:0.8rem;border:none;font-weight:600;">
+                        🗺️ Ver GPS
+                    </button>
+                </div>
+
+                <!-- GPS Map Overlay Form -->
+                <div id="scorecard-map-container" style="display:none;width:100%;height:300px;border-radius:16px;background:var(--bg-secondary);margin-bottom:24px;overflow:hidden;position:relative;">
+                    <div id="gps-distance-hud" style="position:absolute;bottom:16px;left:50%;transform:translateX(-50%);background:var(--bg-glass);backdrop-filter:blur(8px);padding:8px 16px;border-radius:24px;color:white;z-index:999;font-weight:700;display:none;border:1px solid var(--accent-primary);">
+                        <span id="gps-yards">--</span> yds
+                    </div>
+                    <button onclick="window.GolfMap.centerOnUser()" style="position:absolute;top:16px;right:16px;z-index:999;background:white;color:black;border:none;border-radius:50%;width:36px;height:36px;box-shadow:0 2px 8px rgba(0,0,0,0.3);font-size:1.2rem;display:flex;align-items:center;justify-content:center;">🎯</button>
+                </div>
+
+                <div id="scorecard-players-container" style="display:flex;flex-direction:column;gap:16px;margin-bottom:32px;">
+                    <!-- Players Score UI will be injected here -->
+                </div>              </div>
+
+                <div style="display:flex;justify-content:space-between;gap:16px;margin-bottom:32px;">
+                     <button class="secondary-card" style="flex:1;text-align:center;padding:16px;" onclick="ScorecardApp.prevHole()">Anterior</button>
+                     <button class="primary-card" style="flex:1;text-align:center;padding:16px;background:var(--accent-primary);" onclick="ScorecardApp.nextHole()">Próximo</button>
+                </div>
+                
+                <button class="secondary-card" style="width:100%;text-align:center;border-color:var(--danger);color:var(--danger);" onclick="ScorecardApp.finishMatch()">
+                     Finalizar Partida Agora
+                </button>
+            </section>
+
+            <section id="view-history" class="view hidden">
+                <div class="view-header">
+                    <button class="icon-btn back-btn" onclick="app.navigate('view-home')">⬅</button>
+                    <h2>Histórico & Stats</h2>
+                </div>
+                
+                <!-- Stats Dashboard -->
+                <div id="stats-dashboard" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px;">
+                    <div class="primary-card" style="padding:16px;">
+                         <p style="font-size:0.8rem;color:var(--text-secondary);">Média (18 Buracos)</p>
+                         <h3 id="stat-avg-score">--</h3>
+                    </div>
+                    <div class="primary-card" style="padding:16px;">
+                         <p style="font-size:0.8rem;color:var(--text-secondary);">Melhor Partida</p>
+                         <h3 id="stat-best-score">--</h3>
+                    </div>
+                    <div class="secondary-card" style="grid-column: span 2; padding:16px;">
+                         <p style="font-size:0.8rem;color:var(--text-secondary);">Birdies / Pars / Bogeys</p>
+                         <h3 id="stat-distribution">-- / -- / --</h3>
+                    </div>
+                </div>
+
+                <h3>Suas Partidas</h3>
+                <div id="history-list" style="margin-top:16px;display:flex;flex-direction:column;gap:12px;">
+                     <!-- List injected here -->
+                </div>
+            </section>
+
+        </main>
+        
+        <!-- Bottom Tab Bar (Contextual) -->
+        <nav class="bottom-tab-bar" id="bottom-tabBar">
+            <button class="tab-item active" onclick="app.navigate('view-home')">Início</button>
+            <button class="tab-item" onclick="app.navigate('view-courses')">Campos</button>
+        </nav>
+    </div>
+
+    <!-- Application Logic -->
+    <script src="js/storage.js"></script>
+    <script src="js/map.js"></script>
+    <script src="js/scorecard.js"></script>
+    <script src="js/history.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
