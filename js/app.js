@@ -452,6 +452,36 @@ const app = (function() {
          reader.readAsText(file);
     }
 
+    async function processAuth(isRegistration) {
+         const email = document.getElementById('auth-email').value.trim();
+         const pass = document.getElementById('auth-pass').value.trim();
+         
+         if(!email || !pass || pass.length < 6) {
+             alert('Digite um email válido e senha de no mínimo 6 letras.');
+             return;
+         }
+
+         let success = false;
+         if(isRegistration) {
+             success = await window.AuthApp.register(email, pass);
+             if (success) success = await window.AuthApp.login(email, pass); // Auto-login after sign-up
+         } else {
+             success = await window.AuthApp.login(email, pass);
+         }
+
+         if (success) {
+             document.getElementById('auth-email').value = '';
+             document.getElementById('auth-pass').value = '';
+             
+             // Trigger background pull
+             if (window.db && typeof window.db.syncPullCourses === 'function') {
+                 window.db.syncPullCourses();
+             }
+             
+             init(); // Restart lifecycle
+         }
+    }
+
     // Export public methods
     return {
         init,

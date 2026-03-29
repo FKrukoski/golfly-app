@@ -4,7 +4,7 @@
 
 // We will inject the Supabase client via unpkg CDN in index.html
 const SUPABASE_URL = 'https://ezxfxcnenamvqfpbkivt.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_-JMx-ZqTGMWpKe08iLd92Q_qGisVg_Q';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV6eGZ4Y25lbmFtdnFmcGJraXZ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ3Mzk1NTgsImV4cCI6MjA5MDMxNTU1OH0.yK--YAE8JKOsyidGKw3wCKWhNXbX6-WXKlC81caJHCc';
 
 window.supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
