@@ -19,16 +19,31 @@ window.db = (function() {
         async saveCourse(course) {
             if (!course.id) course.id = `course_${Date.now()}`;
             await courseStore.setItem(course.id, course);
+            
+            // Push Sync
+            if (window.AuthApp && window.AuthApp.getUser() && window.supabaseClient) {
+                const user = window.AuthApp.getUser();
+                const payload = {
+                    id: course.id,
+                    name: course.name || '',
+                    city: course.city || '',
+                    physical_holes: course.physicalHoles || 18,
+                    total_par: course.totalPar || 0,
+                    holes: course.holes || [],
+                    created_by: user.id
+                };
+                window.supabaseClient.from('courses').upsert(payload, { onConflict: 'id' }).then().catch(e => console.error(e));
+            }
             return course;
         },
         async deleteCourse(id) {
             await courseStore.removeItem(id);
+            if (window.supabaseClient && window.AuthApp && window.AuthApp.getUser()) {
+                 window.supabaseClient.from('courses').delete().eq('id', id).then().catch(e => console.error(e));
+            }
         },
         async getCourse(id) {
             return await courseStore.getItem(id);
-        },
-        async deleteCourse(id) {
-            await courseStore.removeItem(id);
         },
 
         // Matches CRUD
@@ -40,6 +55,18 @@ window.db = (function() {
         async saveMatch(match) {
             if (!match.id) match.id = `match_${Date.now()}`;
             await matchStore.setItem(match.id, match);
+            
+            // Push Sync
+            if (match.finished && window.AuthApp && window.AuthApp.getUser() && window.supabaseClient) {
+                const user = window.AuthApp.getUser();
+                const payload = {
+                    id: match.id,
+                    course_id: match.courseId || null,
+                    match_state: match,
+                    user_id: user.id
+                };
+                window.supabaseClient.from('matches').upsert(payload, { onConflict: 'id' }).then().catch(e => console.error(e));
+            }
             return match;
         },
 
@@ -52,6 +79,34 @@ window.db = (function() {
         },
         async clearActiveMatch() {
             await activeMatchStore.removeItem('current');
+        },
+        
+        // Supabase Background Pull
+        async syncPullCourses() {
+             if (!window.AuthApp || !window.supabaseClient) return;
+             const user = window.AuthApp.getUser();
+             if (!user) return;
+             
+             try {
+                 const { data, error } = await window.supabaseClient.from('courses').select('*');
+                 if (error) throw error;
+                 
+                 if (data && data.length > 0) {
+                     for(let row of data) {
+                         const localObj = {
+                             id: row.id,
+                             name: row.name,
+                             city: row.city,
+                             physicalHoles: row.physical_holes,
+                             totalPar: row.total_par,
+                             holes: row.holes || []
+                         };
+                         await courseStore.setItem(row.id, localObj);
+                     }
+                 }
+             } catch(e) {
+                 console.error("Erro no Pull Supabase:", e);
+             }
         }
     };
 })();

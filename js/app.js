@@ -9,7 +9,16 @@ const app = (function() {
     let currentMappingHoleIdx = 1;
 
     async function init() {
-        console.log("App initializing...");
+         console.log("App initializing...");
+         
+         // Supabase Auth Check
+         if (window.AuthApp) {
+             const loggedIn = await window.AuthApp.checkSession();
+             if (!loggedIn) {
+                  navigate('view-auth');
+                  return; // Stop initialization, force login
+             }
+         }
         
         // Attempt to resume active match if it exists
         const resumed = await ScorecardApp.resumeActive();
@@ -259,6 +268,12 @@ const app = (function() {
              document.getElementById('mapper-lng-input').value = "";
         }
         
+        let holePar = 4; // Default
+        if (existingData && existingData.par) {
+             holePar = existingData.par;
+        }
+        app.setManualPar(holePar);
+        
         window.onPointCaptured = function(type) {
              const points = window.GolfMap.getHoleData();
              if (points && points.greenCenter) {
@@ -308,6 +323,27 @@ const app = (function() {
          }
     }
 
+    function setManualPar(parValue) {
+         // UI Toggle
+         document.querySelectorAll('.par-btn').forEach(btn => {
+              btn.style.background = 'transparent';
+              btn.style.boxShadow = 'none';
+         });
+         const targetBtn = document.getElementById(`par-btn-${parValue}`);
+         if (targetBtn) {
+              targetBtn.style.background = 'var(--accent-primary)';
+              targetBtn.style.boxShadow = '0 0 12px var(--accent-glow)';
+         }
+         
+         // Persist Memory
+         let existing = activeMappingCourse.holes.find(h => h.number === currentMappingHoleIdx);
+         if (existing) {
+              existing.par = parValue;
+         } else {
+              activeMappingCourse.holes.push({ number: currentMappingHoleIdx, points: null, par: parValue });
+         }
+    }
+
     function switchMapperHole(newHoleNum) {
         persistCurrentPointsIntoMemory();
         loadMapperHole(newHoleNum);
@@ -333,6 +369,13 @@ const app = (function() {
 
     async function saveMappingProgress() {
         persistCurrentPointsIntoMemory();
+        
+        let total = 0;
+        activeMappingCourse.holes.forEach(h => {
+             total += (h.par || 4); // Default to par 4 if unset
+        });
+        activeMappingCourse.totalPar = total;
+
         await db.saveCourse(activeMappingCourse);
         alert('Progresso salvo com sucesso! O Campo está pronto pra jogo.');
         activeMappingCourse = null;
@@ -383,6 +426,7 @@ const app = (function() {
                      if (!isNaN(lat) && !isNaN(lng)) {
                          activeMappingCourse.holes.push({
                              number: i + 1,
+                             par: 4, // Default to 4 on CSV
                              points: {
                                  greenCenter: { lat, lng }
                              }
@@ -419,7 +463,9 @@ const app = (function() {
         saveMappingProgress,
         cancelMapping,
         applyManualCoords,
-        handleCsvUpload
+        handleCsvUpload,
+        setManualPar,
+        processAuth
     };
 })();
 

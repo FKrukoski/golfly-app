@@ -20,11 +20,11 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
     
     <link rel="stylesheet" href="css/style.css">
-    <!-- Localforage for better IndexedDB handling -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     
-    <!-- Leaflet Rotate Plugin (For Touch and Shift+Mouse Rotation) -->
+    <!-- Supabase SDK & Leaflet Rotate Plugin -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://unpkg.com/leaflet-rotate@0.2.8/dist/leaflet-rotate-src.js"></script>
 </head>
 <body>
@@ -39,8 +39,31 @@
 
         <!-- Main Content Area -->
         <main id="main-content">
+            <!-- Authentication View -->
+            <section id="view-auth" class="view active">
+                <div class="hero-section" style="padding-top:60px; text-align:center;">
+                    <div style="font-size:4rem; margin-bottom:16px;">🏌️‍♂️</div>
+                    <h2>Bem-vindo Oficial</h2>
+                    <p>Entre na sua conta para plugar seus campos e jogos com a nuvem Segura do Supabase.</p>
+                </div>
+                
+                <div style="margin-top:32px; display:flex; flex-direction:column; gap:16px; align-items:center;">
+                     <input type="email" id="auth-email" placeholder="E-mail Pessoal" style="width:100%; padding:16px; border-radius:12px; background:var(--bg-secondary); border:1px solid var(--border-subtle); color:white; font-size:1rem;">
+                     
+                     <input type="password" id="auth-pass" placeholder="Criar/Digitar Senha" style="width:100%; padding:16px; border-radius:12px; background:var(--bg-secondary); border:1px solid var(--border-subtle); color:white; font-size:1rem;">
+                     
+                     <button class="primary-card" id="auth-action-btn" style="width:100%; text-align:center; background:var(--accent-primary); color:#fff; font-weight:bold; margin-top:8px;" onclick="app.processAuth(false)">
+                         Acessar Conta Confirmada
+                     </button>
+
+                     <button class="secondary-card" style="width:100%; text-align:center; font-size:0.9rem; padding:12px;" onclick="app.processAuth(true)">
+                         Não tenho conta, CRIAR AGORA
+                     </button>
+                </div>
+            </section>
+
             <!-- Navigation Home View -->
-            <section id="view-home" class="view active">
+            <section id="view-home" class="view hidden">
                 <div class="hero-section">
                     <h2>Pronto para jogar?</h2>
                     <p>Gerencie seus campos, acompanhe seus jogos e analise suas estatísticas.</p>
@@ -112,6 +135,13 @@
                             <label style="font-size:0.7rem; color:var(--text-secondary);">LONGITUDE</label>
                             <input type="number" id="mapper-lng-input" step="any" placeholder="-49.00000" style="width:100%; padding:8px 12px; border-radius:8px; background:var(--bg-primary); border:1px solid var(--border-subtle); color:white; font-size:0.9rem;" onblur="app.applyManualCoords()">
                         </div>
+                    </div>
+                    
+                    <!-- Par Selector micro editor -->
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; background:var(--bg-primary); border-radius:12px; padding:4px; border:1px solid var(--border-subtle);">
+                         <button class="par-btn" id="par-btn-3" style="padding:8px; flex:1; text-align:center; border-radius:8px; border:none; background:transparent; color:white; font-weight:bold; cursor:pointer;" onclick="app.setManualPar(3)">Par 3</button>
+                         <button class="par-btn" id="par-btn-4" style="padding:8px; flex:1; text-align:center; border-radius:8px; border:none; background:transparent; color:white; font-weight:bold; cursor:pointer;" onclick="app.setManualPar(4)">Par 4</button>
+                         <button class="par-btn" id="par-btn-5" style="padding:8px; flex:1; text-align:center; border-radius:8px; border:none; background:transparent; color:white; font-weight:bold; cursor:pointer;" onclick="app.setManualPar(5)">Par 5</button>
                     </div>
 
                     <button class="primary-card" id="btn-save-progress" style="width:100%; text-align:center; background:var(--accent-primary); color:#fff;" onclick="app.saveMappingProgress()">
@@ -227,6 +257,7 @@
     </div>
 
     <!-- Application Logic -->
+    <script src="js/auth.js"></script>
     <script src="js/storage.js"></script>
     <script src="js/map.js"></script>
     <script src="js/scorecard.js"></script>
