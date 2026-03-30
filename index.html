@@ -45,10 +45,12 @@
                 <h3 id="user-display-email">Usuário</h3>
                 <p id="user-display-role" style="font-size:0.8rem; color:var(--text-secondary);">Jogador</p>
             </div>
-            <div class="sidebar-content">
-                <button class="menu-item" onclick="app.navigate('view-history')">📊 Meu Histórico</button>
-                <button class="menu-item" onclick="app.navigate('view-courses')">⛳ Meus Campos</button>
+            <div class="sidebar-content" style="display:flex; flex-direction:column; height:100%;">
+                <button class="menu-item" onclick="app.navigate('view-home'); app.toggleSidebar();">🏠 Início</button>
+                <button class="menu-item" onclick="app.navigate('view-courses'); app.toggleSidebar();">⛳ Meus Campos</button>
+                <button class="menu-item" onclick="app.navigate('view-history'); app.toggleSidebar();">📊 Meu Histórico</button>
                 <div style="flex:1;"></div>
+                <p style="font-size:0.7rem; color:var(--text-secondary); text-align:center; margin-bottom:8px;">v1.2 PWA Edition</p>
                 <button class="menu-item logout-btn" onclick="AuthApp.logout()">🚪 Sair da Conta</button>
             </div>
         </div>
@@ -255,11 +257,20 @@
                     <!-- Players Score UI will be injected here -->
                 </div>              </div>
 
+                <div style="display:flex;justify-content:space-between;gap:12px;margin-bottom:12px;">
+                     <button class="secondary-card" style="flex:1;text-align:center;padding:14px;background:var(--bg-secondary);" onclick="ScorecardApp.prevHole()">
+                         ⬅ Anterior
+                     </button>
+                     <button class="primary-card" style="flex:1;text-align:center;padding:14px;background:var(--bg-secondary);" onclick="ScorecardApp.nextHole()">
+                         Próximo ➡
+                     </button>
+                </div>
+                
                 <div style="display:flex;justify-content:space-between;gap:12px;margin-bottom:32px;">
-                     <button class="secondary-card" style="flex:1;text-align:center;padding:16px;background:var(--bg-glass);" onclick="ScorecardApp.saveAndExit()">
+                     <button class="secondary-card" style="flex:1;text-align:center;padding:14px;background:var(--bg-glass);border-color:var(--border-subtle);" onclick="ScorecardApp.saveAndExit()">
                          💾 Pausar
                      </button>
-                     <button class="primary-card" style="flex:1;text-align:center;padding:16px;background:var(--accent-primary);color:white;font-weight:700;" onclick="ScorecardApp.confirmFinishMatch()">
+                     <button class="primary-card" style="flex:1;text-align:center;padding:14px;background:var(--accent-primary);color:white;font-weight:700;" onclick="ScorecardApp.confirmFinishMatch()">
                          🏆 Finalizar
                      </button>
                 </div>
@@ -295,11 +306,7 @@
 
         </main>
         
-        <!-- Bottom Tab Bar (Contextual) -->
-        <nav class="bottom-tab-bar" id="bottom-tabBar">
-            <button class="tab-item active" onclick="app.navigate('view-home')">Início</button>
-            <button class="tab-item" onclick="app.navigate('view-courses')">Campos</button>
-        </nav>
+        <!-- Bottom Tab Bar removida por solicitação: navegação agora é via menu lateral -->
     </div>
 
     <!-- Application Logic -->

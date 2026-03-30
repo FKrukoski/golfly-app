@@ -51,9 +51,6 @@ const app = (function() {
         // Hide all views
         document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
         
-        // Remove active class from tabs
-        document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
-
         // Show target view
         const target = document.getElementById(viewId);
         const previousView = currentView;
@@ -62,18 +59,12 @@ const app = (function() {
             currentView = viewId;
         }
 
-        // Highlight bottom bar if applicable
-        if (viewId === 'view-home') {
-             const tabs = document.querySelectorAll('.tab-item');
-             if(tabs.length > 0) tabs[0].classList.add('active');
-        } else if (viewId === 'view-courses') {
-             const tabs = document.querySelectorAll('.tab-item');
-             if(tabs.length > 1) tabs[1].classList.add('active');
+        // View-specific logic
+        if (viewId === 'view-courses') {
              renderCourseList();
         } else if (viewId === 'view-course-editor') {
              initCourseEditor();
         } else if (viewId === 'view-new-match' && previousView !== 'view-new-match') {
-             // Let the Scorecard module initialize the match view correctly
              setTimeout(() => ScorecardApp.initNewMatchView(), 0);
         } else if (viewId === 'view-history' && previousView !== 'view-history') {
              setTimeout(() => HistoryApp.initHistoryView(), 0);

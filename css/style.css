@@ -84,7 +84,7 @@ h1, h2, h3, h4 {
 /* Layout */
 #app-container {
   padding-top: 76px;
-  padding-bottom: 80px;
+  padding-bottom: env(safe-area-inset-bottom);
   min-height: 100vh;
   display: flex;
   flex-direction: column;
@@ -170,38 +170,6 @@ h1, h2, h3, h4 {
 .primary-card p, .secondary-card p {
   color: var(--text-secondary);
   font-size: 0.875rem;
-}
-
-/* Bottom Tab Bar */
-.bottom-tab-bar {
-  position: fixed;
-  bottom: 0;
-  width: 100%;
-  background: var(--bg-glass);
-  backdrop-filter: blur(20px);
-  border-top: 1px solid var(--border-subtle);
-  display: flex;
-  justify-content: space-around;
-  padding: 12px 0 calc(12px + env(safe-area-inset-bottom));
-  z-index: 1000;
-}
-
-.tab-item {
-  background: none;
-  border: none;
-  color: var(--text-secondary);
-  font-family: var(--font-main);
-  font-weight: 500;
-  font-size: 0.875rem;
-  padding: 12px 24px;
-  cursor: pointer;
-  transition: color var(--transition-fast);
-  border-radius: 20px;
-}
-
-.tab-item.active {
-  color: var(--accent-primary);
-  background: rgba(16, 185, 129, 0.1);
 }
 
 /* Utility / Buttons */
