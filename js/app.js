@@ -20,6 +20,14 @@ const app = (function() {
              const user = window.AuthApp.getUser();
              if(user) {
                  document.getElementById('user-display-email').innerText = user.email;
+                 
+                 // CORREÇÃO: Atualizar o rótulo de cargo (Admin vs Jogador)
+                 const role = window.AuthApp.getRole();
+                 const roleLabel = document.getElementById('user-display-role');
+                 if (roleLabel) {
+                     roleLabel.innerText = role === 'admin' ? 'Administrador' : 'Jogador';
+                     roleLabel.style.color = role === 'admin' ? 'var(--accent-primary)' : 'var(--text-secondary)';
+                 }
              }
          }
         
@@ -61,6 +69,12 @@ const app = (function() {
              try {
                   const registration = await navigator.serviceWorker.register('sw.js');
                   console.log('ServiceWorker registered:', registration.scope);
+                  
+                  // Detecção de atualização do Service Worker
+                  navigator.serviceWorker.addEventListener('controllerchange', () => {
+                      console.log('Novo conteúdo disponível, recarregando...');
+                      window.location.reload();
+                  });
              } catch (e) {
                   console.error('ServiceWorker registration failed:', e);
              }
@@ -160,7 +174,7 @@ const app = (function() {
     }
 
     async function deleteCourseUi(id) {
-         if (confirm('Tem certeza que deseja apagar este campo completamente? (Incluindo todos os pinos de mapeamento)')) {
+         if (confirm('Tem certeza que deseja apagar este campo completamente?')) {
               await db.deleteCourse(id);
               renderCourseList();
          }
@@ -213,7 +227,7 @@ const app = (function() {
         const formatInput = document.getElementById('course-format');
         
         if (!nameInput.value.trim() || !cityInput.value.trim()) {
-            alert('Por favor, informe um nome e a cidade para o campo.');
+            alert('Por favor, informe Nome e Cidade.');
             return;
         }
 
@@ -227,30 +241,22 @@ const app = (function() {
         };
 
         currentMappingHoleIdx = 1;
-        
-        // Disable UI and show loading
         document.getElementById('mapper-instruction').innerText = 'Localizando cidade no GPS... Aguarde.';
         navigate('view-course-mapper');
         document.getElementById('mapper-course-name').innerText = activeMappingCourse.name;
         document.getElementById('mapper-total-holes').innerText = activeMappingCourse.physicalHoles;
         
-        // Geocoding request
-        let centerLatLng = [-23.5505, -46.6333]; // Fallback SP
+        let centerLatLng = [-23.5505, -46.6333];
         try {
             const query = encodeURIComponent(activeMappingCourse.city);
             const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${query}&limit=1`);
             const data = await response.json();
             if(data && data.length > 0) {
                  centerLatLng = [parseFloat(data[0].lat), parseFloat(data[0].lon)];
-            } else {
-                 alert('Cidade não encontrada pelo satélite. Abriremos o mapa padrão.');
             }
-        } catch (e) {
-            console.error('Geocoding error', e);
-        }
+        } catch (e) { console.error(e); }
 
-        document.getElementById('mapper-instruction').innerText = 'Selecione o tipo de ponto abaixo e toque no mapa georreferenciado para fixá-lo. Segure as marcações para arrastá-las. Segure SHIFT no PC ou gire os dois dedos no Celular para rotacionar.';
-        
+        document.getElementById('mapper-instruction').innerText = 'Selecione o ponto e toque no mapa para fixar.';
         loadMapperHole(currentMappingHoleIdx, centerLatLng);
     }
 
@@ -260,44 +266,30 @@ const app = (function() {
 
         activeMappingCourse = course;
         currentMappingHoleIdx = 1;
-        
-        // Disable UI and show loading
-        document.getElementById('mapper-instruction').innerText = 'Localizando cidade no GPS... Aguarde.';
         navigate('view-course-mapper');
         document.getElementById('mapper-course-name').innerText = activeMappingCourse.name;
         document.getElementById('mapper-total-holes').innerText = activeMappingCourse.physicalHoles;
 
         let centerLatLng = [-23.5505, -46.6333];
         try {
-            if (activeMappingCourse.city) {
-                const query = encodeURIComponent(activeMappingCourse.city);
-                const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${query}&limit=1`);
-                const data = await response.json();
-                if(data && data.length > 0) {
-                     centerLatLng = [parseFloat(data[0].lat), parseFloat(data[0].lon)];
-                }
-            }
+            const query = encodeURIComponent(activeMappingCourse.city);
+            const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${query}&limit=1`);
+            const data = await response.json();
+            if(data && data.length > 0) { centerLatLng = [parseFloat(data[0].lat), parseFloat(data[0].lon)]; }
         } catch (e) { console.error(e); }
 
-        document.getElementById('mapper-instruction').innerText = 'Edite ou insira os pontos do buraco e clique em Salvar para manter o progresso.';
-        
         loadMapperHole(currentMappingHoleIdx, centerLatLng);
     }
 
     function loadMapperHole(holeNum, centerLatLng = null) {
         currentMappingHoleIdx = holeNum;
-        
-        // Render the horizontal scroll holes
         const scrollContainer = document.getElementById('mapper-holes-scroll');
         let html = '';
         for(let i=1; i<=activeMappingCourse.physicalHoles; i++) {
              const hasData = activeMappingCourse.holes.find(h => h.number === i && h.points.greenCenter);
              const badgeColor = i === holeNum ? 'var(--accent-primary)' : (hasData ? '#10B981' : 'var(--bg-glass)');
              const isSelected = i === holeNum ? 'border:2px solid #fff;' : 'border:none;';
-             
-             html += `<div style="padding:10px 16px; border-radius:12px; background:${badgeColor}; color:white; font-weight:700; cursor:pointer; flex-shrink:0; ${isSelected}" onclick="app.switchMapperHole(${i})">
-                 Buraco ${i}
-             </div>`;
+             html += `<div style="padding:10px 16px; border-radius:12px; background:${badgeColor}; color:white; font-weight:700; cursor:pointer; flex-shrink:0; ${isSelected}" onclick="app.switchMapperHole(${i})">Buraco ${i}</div>`;
         }
         scrollContainer.innerHTML = html;
 
@@ -322,9 +314,7 @@ const app = (function() {
         }
         
         let holePar = 4;
-        if (existingData && existingData.par) {
-             holePar = existingData.par;
-        }
+        if (existingData && existingData.par) { holePar = existingData.par; }
         app.setManualPar(holePar);
         
         window.onPointCaptured = function(type) {
@@ -345,10 +335,7 @@ const app = (function() {
              const hasData = activeMappingCourse.holes.find(h => h.number === i && h.points.greenCenter);
              const badgeColor = i === holeNum ? 'var(--accent-primary)' : (hasData ? '#10B981' : 'var(--bg-glass)');
              const isSelected = i === holeNum ? 'border:2px solid #fff;' : 'border:none;';
-             
-             html += `<div style="padding:10px 16px; border-radius:12px; background:${badgeColor}; color:white; font-weight:700; cursor:pointer; flex-shrink:0; ${isSelected}" onclick="app.switchMapperHole(${i})">
-                 Buraco ${i}
-             </div>`;
+             html += `<div style="padding:10px 16px; border-radius:12px; background:${badgeColor}; color:white; font-weight:700; cursor:pointer; flex-shrink:0; ${isSelected}" onclick="app.switchMapperHole(${i})">Buraco ${i}</div>`;
         }
         scrollContainer.innerHTML = html;
     }
@@ -356,15 +343,10 @@ const app = (function() {
     function applyManualCoords() {
          const lat = parseFloat(document.getElementById('mapper-lat-input').value);
          const lng = parseFloat(document.getElementById('mapper-lng-input').value);
-         
          if (!isNaN(lat) && !isNaN(lng)) {
              let existing = activeMappingCourse.holes.find(h => h.number === currentMappingHoleIdx);
              const fixedPoints = { greenCenter: {lat, lng} };
-             if (existing) {
-                 existing.points = fixedPoints;
-             } else {
-                 activeMappingCourse.holes.push({ number: currentMappingHoleIdx, points: fixedPoints });
-             }
+             if (existing) { existing.points = fixedPoints; } else { activeMappingCourse.holes.push({ number: currentMappingHoleIdx, points: fixedPoints }); }
              window.GolfMap.loadMapContext(activeMappingCourse.holes, currentMappingHoleIdx);
              window.GolfMap.setCenter(lat, lng);
              loadMapperHoleSilently(currentMappingHoleIdx);
@@ -373,37 +355,24 @@ const app = (function() {
 
     function setManualPar(parValue) {
          document.querySelectorAll('.par-btn').forEach(btn => {
-              btn.style.background = 'transparent';
-              btn.style.boxShadow = 'none';
+              btn.style.background = 'transparent'; btn.style.boxShadow = 'none';
          });
          const targetBtn = document.getElementById(`par-btn-${parValue}`);
          if (targetBtn) {
-              targetBtn.style.background = 'var(--accent-primary)';
-              targetBtn.style.boxShadow = '0 0 12px var(--accent-glow)';
+              targetBtn.style.background = 'var(--accent-primary)'; targetBtn.style.boxShadow = '0 0 12px var(--accent-glow)';
          }
          let existing = activeMappingCourse.holes.find(h => h.number === currentMappingHoleIdx);
-         if (existing) {
-              existing.par = parValue;
-         } else {
-              activeMappingCourse.holes.push({ number: currentMappingHoleIdx, points: null, par: parValue });
-         }
+         if (existing) { existing.par = parValue; } else { activeMappingCourse.holes.push({ number: currentMappingHoleIdx, points: null, par: parValue }); }
     }
 
-    function switchMapperHole(newHoleNum) {
-        persistCurrentPointsIntoMemory();
-        loadMapperHole(newHoleNum);
-    }
+    function switchMapperHole(newHoleNum) { persistCurrentPointsIntoMemory(); loadMapperHole(newHoleNum); }
     
     function persistCurrentPointsIntoMemory() {
         const points = window.GolfMap.getHoleData();
         if (!points || !points.greenCenter) return;
         let existing = activeMappingCourse.holes.find(h => h.number === currentMappingHoleIdx);
         const pointsClone = JSON.parse(JSON.stringify(points));
-        if (existing) {
-             existing.points = pointsClone;
-        } else {
-             activeMappingCourse.holes.push({ number: currentMappingHoleIdx, points: pointsClone });
-        }
+        if (existing) { existing.points = pointsClone; } else { activeMappingCourse.holes.push({ number: currentMappingHoleIdx, points: pointsClone }); }
     }
 
     async function saveMappingProgress() {
@@ -412,17 +381,12 @@ const app = (function() {
         activeMappingCourse.holes.forEach(h => { total += (h.par || 4); });
         activeMappingCourse.totalPar = total;
         await db.saveCourse(activeMappingCourse);
-        alert('Progresso salvo com sucesso!');
+        alert('Salvo com sucesso!');
         activeMappingCourse = null;
         navigate('view-courses');
     }
 
-    function cancelMapping() {
-        if(confirm('Mapeamento cancelado. Dados não salvos serão perdidos.')) {
-            activeMappingCourse = null;
-            navigate('view-courses');
-        }
-    }
+    function cancelMapping() { if(confirm('Cancelar?')) { activeMappingCourse = null; navigate('view-courses'); } }
 
     async function handleCsvUpload(event) {
          const file = event.target.files[0];
@@ -440,8 +404,7 @@ const app = (function() {
              for(let i = 0; i < lines.length && i < phys; i++) {
                  const parts = lines[i].split(/[,;]/);
                  if (parts.length >= 2) {
-                     const lat = parseFloat(parts[0]);
-                     const lng = parseFloat(parts[1]);
+                     const lat = parseFloat(parts[0]); const lng = parseFloat(parts[1]);
                      if (!isNaN(lat) && !isNaN(lng)) { activeMappingCourse.holes.push({ number: i + 1, par: 4, points: { greenCenter: { lat, lng } } }); }
                  }
              }
@@ -465,9 +428,7 @@ const app = (function() {
          if(isRegistration) {
              success = await window.AuthApp.register(email, pass);
              if (success) success = await window.AuthApp.login(email, pass);
-         } else {
-             success = await window.AuthApp.login(email, pass);
-         }
+         } else { success = await window.AuthApp.login(email, pass); }
          if (success) {
              document.getElementById('auth-email').value = '';
              document.getElementById('auth-pass').value = '';
@@ -483,28 +444,20 @@ const app = (function() {
         const progressContainer = document.getElementById('map-progress-container');
         const progressBar = document.getElementById('map-progress-bar');
         const progressPercent = document.getElementById('map-progress-percent');
-        progressContainer.style.display = 'block';
-        progressBar.style.width = '0%';
-        progressPercent.innerText = '0%';
+        progressContainer.style.display = 'block'; progressBar.style.width = '0%'; progressPercent.innerText = '0%';
         const staticUrl = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/export?bbox=${bounds[0][1]},${bounds[0][0]},${bounds[1][1]},${bounds[1][0]}&bboxSR=4326&size=1024,1024&format=png&f=image`;
         let progress = 0;
         const interval = setInterval(() => {
             if (progress < 90) {
-                progress += Math.random() * 15;
-                if (progress > 90) progress = 90;
-                progressBar.style.width = `${Math.round(progress)}%`;
-                progressPercent.innerText = `${Math.round(progress)}%`;
+                progress += Math.random() * 15; if (progress > 90) progress = 90;
+                progressBar.style.width = `${Math.round(progress)}%`; progressPercent.innerText = `${Math.round(progress)}%`;
             }
         }, 300);
         try {
-            const resp = await fetch(staticUrl);
-            if (!resp.ok) throw new Error("Download failed");
-            const blob = await resp.blob();
-            const reader = new FileReader();
+            const resp = await fetch(staticUrl); if (!resp.ok) throw new Error("Download failed");
+            const blob = await resp.blob(); const reader = new FileReader();
             reader.onloadend = async () => {
-                clearInterval(interval);
-                progressBar.style.width = '100%';
-                progressPercent.innerText = '100%';
+                clearInterval(interval); progressBar.style.width = '100%'; progressPercent.innerText = '100%';
                 activeMappingCourse.offlineMap = { image: reader.result, bounds: bounds };
                 await db.saveCourse(activeMappingCourse);
                 setTimeout(() => { alert("Mapa Offline Salvo!"); progressContainer.style.display = 'none'; }, 500);
@@ -513,21 +466,17 @@ const app = (function() {
         } catch(e) { clearInterval(interval); progressContainer.style.display = 'none'; alert("Erro ao baixar mapa."); }
     }
 
-    // --- RBAC Request Logic ---
     async function submitRequest(type) {
         if (type === 'course') {
             const name = document.getElementById('req-course-name').value.trim();
             const loc = document.getElementById('req-course-loc').value.trim();
             if (!name || !loc) return alert("Preencha todos os campos.");
-            await db.sendCourseRequest(name, loc);
-            alert("Sugestão enviada!");
-            document.getElementById('req-course-name').value = '';
-            document.getElementById('req-course-loc').value = '';
+            await db.sendCourseRequest(name, loc); alert("Sugestão enviada!");
+            document.getElementById('req-course-name').value = ''; document.getElementById('req-course-loc').value = '';
         } else {
             const reason = document.getElementById('req-admin-reason').value.trim();
             if (!reason) return alert("Justifique seu pedido.");
-            await db.sendAdminRequest(reason);
-            alert("Pedido enviado.");
+            await db.sendAdminRequest(reason); alert("Pedido enviado.");
             document.getElementById('req-admin-reason').value = '';
         }
         navigate('view-home');
@@ -539,11 +488,11 @@ const app = (function() {
         try {
             const cReqs = await db.getPendingRequests('course_requests');
             const aReqs = await db.getPendingRequests('admin_requests');
-            if (cReqs.length === 0 && aReqs.length === 0) { list.innerHTML = '<p style="text-align:center;padding:40px;color:var(--text-secondary);">Nenhum pedido pendente. ☕</p>'; return; }
+            if (cReqs.length === 0 && aReqs.length === 0) { list.innerHTML = '<p style="text-align:center;padding:40px;color:var(--text-secondary);">Nenhum pedido pendente.</p>'; return; }
             let html = '';
             if (cReqs.length > 0) {
                 html += '<h3 style="margin:20px 0 12px;font-size:0.9rem;color:var(--accent-primary);">📍 NOVOS CAMPOS</h3>';
-                html += cReqs.map(r => `<div class="secondary-card" style="margin-bottom:12px;"><p><strong>${r.course_name}</strong> (${r.location})</p><p style="font-size:0.7rem;color:var(--text-secondary);">Solicitado por: ${r.profiles ? r.profiles.email : '?'}</p><div style="display:flex;gap:8px;margin-top:12px;"><button class="primary-card" style="flex:1;font-size:0.8rem;padding:8px;" onclick="app.handleApproval('course_requests', '${r.id}', 'approved')">OK</button><button class="secondary-card" style="flex:1;font-size:0.8rem;padding:8px;color:var(--danger);" onclick="app.handleApproval('course_requests', '${r.id}', 'rejected')">Recusar</button></div></div>`).join('');
+                html += cReqs.map(r => `<div class="secondary-card" style="margin-bottom:12px;"><p><strong>${r.course_name}</strong> (${r.location})</p><p style="font-size:0.7rem;color:var(--text-secondary);">De: ${r.profiles ? r.profiles.email : '?'}</p><div style="display:flex;gap:8px;margin-top:12px;"><button class="primary-card" style="flex:1;font-size:0.8rem;padding:8px;" onclick="app.handleApproval('course_requests', '${r.id}', 'approved')">OK</button><button class="secondary-card" style="flex:1;font-size:0.8rem;padding:8px;color:var(--danger);" onclick="app.handleApproval('course_requests', '${r.id}', 'rejected')">Recusar</button></div></div>`).join('');
             }
             if (aReqs.length > 0) {
                 html += '<h3 style="margin:20px 0 12px;font-size:0.9rem;color:var(--accent-primary);">🛡️ PEDIDOS DE CARGO</h3>';
@@ -555,8 +504,7 @@ const app = (function() {
 
     async function handleApproval(table, id, status, userId = null) {
         if (!confirm(status === 'approved' ? 'Aprovar?' : 'Recusar?')) return;
-        await db.updateRequestStatus(table, id, status, userId);
-        renderAdminPanel();
+        await db.updateRequestStatus(table, id, status, userId); renderAdminPanel();
     }
 
     return {
