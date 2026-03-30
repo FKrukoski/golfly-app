@@ -83,24 +83,53 @@ window.HistoryApp = (function() {
             (m.scores[myPlayer.id] || []).forEach(ballArray => {
                 ballArray.forEach(s => myTotalGross += s);
             });
-            let myNet = myTotalGross - myPlayer.hcp;
-            
+            let myNet = myTotalGross - (myPlayer.hcp || 0);
+
+            const isEdited = m.isEdited ? '<span style="font-size:0.6rem; background:rgba(255,255,255,0.1); padding:2px 6px; border-radius:4px; margin-left:8px; vertical-align:middle; border:1px solid var(--border-subtle);">EDITADO</span>' : '';
+
             return `
             <div class="secondary-card" style="padding:16px;">
                 <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
-                     <h3 style="font-size:1.1rem;">${m.courseName}</h3>
+                     <h3 style="font-size:1.1rem;">${m.courseName}${isEdited}</h3>
                      <div style="text-align:right;">
                          <span style="font-weight:700;color:var(--accent-primary);display:block;">${myNet} Net</span>
                          <span style="font-size:0.8rem;color:var(--text-secondary);">${myTotalGross} Gross</span>
                      </div>
                 </div>
-                <p style="font-size:0.875rem;color:var(--text-secondary);">${m.physicalHoles} Físicos x ${m.ballsMultiplier} Bolas • ${date} • ${m.players.length} Jogadores</p>
+                <p style="font-size:0.8rem;color:var(--text-secondary); margin-bottom:12px;">${m.physicalHoles} Físicos x ${m.ballsMultiplier} Bolas • ${date} • ${m.players.length} Jogadores</p>
+                
+                <div style="display:flex; gap:8px;">
+                    <button class="secondary-card" style="padding:8px 12px; font-size:0.8rem; border-radius:8px; flex:1; text-align:center;" onclick="HistoryApp.editMatch('${m.id}')">✏️ Editar</button>
+                    <button class="secondary-card" style="padding:8px 12px; font-size:0.8rem; border-radius:8px; flex:1; text-align:center; color:var(--danger); border-color:var(--danger-glow);" onclick="HistoryApp.deleteMatch('${m.id}')">🗑️ Excluir</button>
+                </div>
             </div>
             `;
         }).join('');
     }
 
+    async function editMatch(id) {
+        if (!confirm("Ao editar, esta partida voltará ao simulador e sairá do histórico até ser finalizada novamente. Continuar?")) return;
+        
+        const match = await db.getMatch(id);
+        if (match) {
+            match.isEdited = true;
+            await db.deleteMatch(id); 
+            await db.setActiveMatch(match);
+            app.navigate('view-scorecard');
+            ScorecardApp.resumeActive();
+        }
+    }
+
+    async function deleteMatch(id) {
+        if (confirm("Apagar permanentemente este registro?")) {
+            await db.deleteMatch(id);
+            initHistoryView();
+        }
+    }
+
     return {
-        initHistoryView
+        initHistoryView,
+        editMatch,
+        deleteMatch
     };
 })();

@@ -73,18 +73,19 @@ window.ScorecardApp = (function() {
 
          const courseId = select.value;
          const course = await db.getCourse(courseId);
-         
          if (!course) return;
 
          const ballsMultiplier = parseInt(document.getElementById('match-balls-multiplier').value, 10) || 1;
+         const rounds = parseInt(document.getElementById('match-rounds').value, 10) || 1;
 
          // Initialize match state (physical holes dictates UI loop)
          const physicalHoles = course.physicalHoles || 18;
+         const totalHoles = physicalHoles * rounds;
          
          const scores = {};
          matchConfig.players.forEach(p => {
              // Create a 2D array [ball_index][hole_index]
-             scores[p.id] = Array.from({length: ballsMultiplier}, () => Array(physicalHoles).fill(0));
+             scores[p.id] = Array.from({length: ballsMultiplier}, () => Array(totalHoles).fill(0));
          });
 
          activeMatchState = {
@@ -94,8 +95,10 @@ window.ScorecardApp = (function() {
              date: Date.now(),
              players: [...matchConfig.players],
              ballsMultiplier: ballsMultiplier,
-             scores: scores,
+             rounds: rounds,
              physicalHoles: physicalHoles,
+             totalHoles: totalHoles,
+             scores: scores,
              currentHole: 1
          };
 
@@ -104,32 +107,31 @@ window.ScorecardApp = (function() {
     }
 
     async function loadScorecardView() {
-         if (!activeMatchState) {
-             activeMatchState = await db.getActiveMatch();
-         }
-         if (!activeMatchState) return;
+          if (!activeMatchState) {
+              activeMatchState = await db.getActiveMatch();
+          }
+          if (!activeMatchState) return;
 
-         document.getElementById('scorecard-course-name').innerText = activeMatchState.courseName;
-         document.getElementById('current-hole-num').innerText = activeMatchState.currentHole;
-         
-         // Mocking par as 4 for unmapped holes
-         const par = 4; 
-         document.getElementById('current-hole-par-label').innerText = `• Par ${par} (Físico)`;
+          const physHole = ((activeMatchState.currentHole - 1) % activeMatchState.physicalHoles) + 1;
+          const course = await db.getCourse(activeMatchState.courseId);
+          const holeData = course?.holes?.find(h => h.number === physHole);
 
-         // Update map if visible
-         if (isMapVisible && window.GolfMap) {
-             const course = await db.getCourse(activeMatchState.courseId);
-             if (course && course.holes) {
-                  const holeData = course.holes.find(h => h.number === activeMatchState.currentHole);
-                  if (holeData && holeData.points && holeData.points.greenCenter) {
-                       window.GolfMap.loadScorecardGreen(holeData.points.greenCenter.lat, holeData.points.greenCenter.lng);
-                  }
-             }
-             window.GolfMap.centerOnUser();
-         }
+          document.getElementById('scorecard-course-name').innerText = activeMatchState.courseName;
+          document.getElementById('current-hole-num').innerText = activeMatchState.currentHole;
 
-         renderScoreCounters();
-         app.navigate('view-scorecard');
+          const par = holeData?.par || 4; 
+          document.getElementById('current-hole-par-label').innerText = `• Par ${par}`;
+
+          // Update map if visible
+          if (isMapVisible && window.GolfMap) {
+              if (holeData && holeData.points && holeData.points.greenCenter) {
+                   window.GolfMap.loadScorecardGreen(holeData.points.greenCenter.lat, holeData.points.greenCenter.lng);
+              }
+              window.GolfMap.centerOnUser();
+          }
+
+          renderScoreCounters();
+          app.navigate('view-scorecard');
     }
 
     async function toggleGpsMap() {
@@ -137,14 +139,14 @@ window.ScorecardApp = (function() {
          isMapVisible = !isMapVisible;
          if (isMapVisible) {
              mapContainer.style.display = 'block';
+             const course = await db.getCourse(activeMatchState.courseId);
              if (!window.GolfMap.isInitialized()) {
-                  window.GolfMap.initScorecardMap('scorecard-map-container');
+                  window.GolfMap.initScorecardMap('scorecard-map-container', course?.offlineMap);
              }
              
-             // Extract green data to plot the auto-rotating HUD target
-             const course = await db.getCourse(activeMatchState.courseId);
+             // Extract green data 
              if (course && course.holes) {
-                  const holeData = course.holes.find(h => h.number === activeMatchState.currentHole);
+                  const holeData = course.holes.find(h => h.number === activeMappingHoleIdx || activeMatchState.currentHole);
                   if (holeData && holeData.points && holeData.points.greenCenter) {
                        window.GolfMap.loadScorecardGreen(holeData.points.greenCenter.lat, holeData.points.greenCenter.lng);
                   }
@@ -157,47 +159,47 @@ window.ScorecardApp = (function() {
     }
 
     function renderScoreCounters() {
-         const container = document.getElementById('scorecard-players-container');
-         const holeIdx = activeMatchState.currentHole - 1;
+          const container = document.getElementById('scorecard-players-container');
+          const holeIdx = activeMatchState.currentHole - 1;
 
-         container.innerHTML = activeMatchState.players.map(p => {
-             
-             let ballsHtml = '';
-             let totalGross = 0;
-             
-             for (let b = 0; b < activeMatchState.ballsMultiplier; b++) {
-                 const score = activeMatchState.scores[p.id][b][holeIdx] || 0;
-                 const displayScore = score === 0 ? '-' : score;
-                 
-                 // Compute total gross across all physical holes and all balls for this player
-                 activeMatchState.scores[p.id][b].forEach(s => totalGross += s);
+          container.innerHTML = activeMatchState.players.map(p => {
+              
+              let ballsHtml = '';
+              let totalGross = 0;
+              
+              for (let b = 0; b < activeMatchState.ballsMultiplier; b++) {
+                  const score = activeMatchState.scores[p.id][b][holeIdx] || 0;
+                  const displayScore = score === 0 ? '-' : score;
+                  
+                  // Compute total gross across all logical holes and all balls
+                  activeMatchState.scores[p.id][b].forEach(s => totalGross += s);
 
-                 ballsHtml += `
-                 <div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px;background:var(--bg-primary);border-radius:8px;padding:8px 12px;border:1px solid var(--border-subtle);">
-                     <span style="font-size:0.9rem;color:var(--text-secondary);">Bola ${b + 1}</span>
-                     <div style="display:flex;align-items:center;gap:12px;">
-                         <button class="icon-btn" style="background:var(--bg-secondary);width:32px;height:32px;" onclick="ScorecardApp.updateScore('${p.id}', ${b}, -1)">-</button>
-                         <span style="font-size:1.2rem;font-weight:700;width:24px;text-align:center;">${displayScore}</span>
-                         <button class="icon-btn" style="background:var(--bg-secondary);width:32px;height:32px;" onclick="ScorecardApp.updateScore('${p.id}', ${b}, 1)">+</button>
-                     </div>
-                 </div>`;
-             }
-             
-             let netScore = totalGross - p.hcp;
-
-             return `
-             <div class="secondary-card" style="padding:16px;">
-                  <div style="display:flex;align-items:center;justify-content:space-between;">
-                      <h3 style="font-size:1.1rem;margin-bottom:0;">${p.name}</h3>
-                      <div style="text-align:right;">
-                          <p style="font-size:0.8rem;color:var(--text-secondary);">Gross: ${totalGross} | <b>Net: ${netScore}</b></p>
+                  ballsHtml += `
+                  <div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px;background:var(--bg-primary);border-radius:8px;padding:8px 12px;border:1px solid var(--border-subtle);">
+                      <span style="font-size:0.9rem;color:var(--text-secondary);">Bola ${b + 1}</span>
+                      <div style="display:flex;align-items:center;gap:12px;">
+                          <button class="icon-btn" style="background:var(--bg-secondary);width:40px;height:40px;font-size:1.5rem;" onclick="ScorecardApp.updateScore('${p.id}', ${b}, -1)">-</button>
+                          <span style="font-size:1.8rem;font-weight:700;width:30px;text-align:center;">${displayScore}</span>
+                          <button class="icon-btn" style="background:var(--bg-secondary);width:40px;height:40px;font-size:1.5rem;" onclick="ScorecardApp.updateScore('${p.id}', ${b}, 1)">+</button>
                       </div>
-                  </div>
-                  ${ballsHtml}
-             </div>
-             `;
-         }).join('');
-    }
+                  </div>`;
+              }
+              
+              let netScore = totalGross - (p.hcp || 0);
+
+              return `
+              <div class="secondary-card" style="padding:16px;">
+                   <div style="display:flex;align-items:center;justify-content:space-between;">
+                       <h3 style="font-size:1.1rem;margin-bottom:0;">${p.name}</h3>
+                       <div style="text-align:right;">
+                           <p style="font-size:0.8rem;color:var(--text-secondary);">Gross: ${totalGross} | <b>Net: ${netScore}</b></p>
+                       </div>
+                   </div>
+                   ${ballsHtml}
+              </div>
+              `;
+          }).join('');
+     }
 
     async function updateScore(playerId, ballIdx, delta) {
          const holeIdx = activeMatchState.currentHole - 1;
@@ -213,36 +215,56 @@ window.ScorecardApp = (function() {
     }
 
     function nextHole() {
-         if (activeMatchState.currentHole < activeMatchState.physicalHoles) {
-             activeMatchState.currentHole++;
-             db.setActiveMatch(activeMatchState);
-             loadScorecardView();
-         } else {
-             finishMatch();
-         }
-    }
+          if (activeMatchState.currentHole < (activeMatchState.totalHoles || activeMatchState.physicalHoles)) {
+              activeMatchState.currentHole++;
+              db.setActiveMatch(activeMatchState);
+              loadScorecardView();
+          } else {
+              confirmFinishMatch();
+          }
+     }
 
-    function prevHole() {
-         if (activeMatchState.currentHole > 1) {
-             activeMatchState.currentHole--;
-             db.setActiveMatch(activeMatchState);
-             loadScorecardView();
-         }
-    }
+     function prevHole() {
+          if (activeMatchState.currentHole > 1) {
+              activeMatchState.currentHole--;
+              db.setActiveMatch(activeMatchState);
+              loadScorecardView();
+          }
+     }
 
-    function confirmFinishMatch() {
-         if(confirm("Deseja interromper e salvar esta partida?")) {
-             finishMatch();
-         }
-    }
+     function confirmFinishMatch() {
+          let incomplete = false;
+          Object.keys(activeMatchState.scores).forEach(pId => {
+               activeMatchState.scores[pId].forEach(bArr => {
+                    if (bArr.includes(0)) incomplete = true;
+               });
+          });
 
-    async function finishMatch() {
-         await db.saveMatch(activeMatchState);
-         await db.clearActiveMatch();
-         activeMatchState = null;
-         alert("Partida salva no Histórico!");
+          if (incomplete) {
+               alert("Não é possível finalizar com buracos sem pontuação. Use 'Pausar' para sair sem concluir.");
+               return;
+          }
+
+          if(confirm("Deseja FINALIZAR e salvar no histórico oficial?")) {
+              finishMatch();
+          }
+     }
+
+     async function saveAndExit() {
+         await db.setActiveMatch(activeMatchState);
+         alert("Partida pausada. Retome-a no menu inicial.");
          app.navigate('view-home');
-    }
+     }
+
+     async function finishMatch() {
+          activeMatchState.finished = true;
+          activeMatchState.finishedDate = Date.now();
+          await db.saveMatch(activeMatchState);
+          await db.clearActiveMatch();
+          activeMatchState = null;
+          alert("Partida finalizada! 🏆");
+          app.navigate('view-home');
+     }
 
     // Attempt to resume
     async function resumeActive() {
@@ -266,6 +288,7 @@ window.ScorecardApp = (function() {
          prevHole,
          finishMatch,
          confirmFinishMatch,
+         saveAndExit,
          resumeActive
     };
 })();

@@ -31,11 +31,28 @@
     <div id="app-container">
         <!-- Header -->
         <header class="top-nav">
-            <h1 class="logo">Golfly</h1>
-            <button id="nav-menu-btn" class="icon-btn">
+            <button id="nav-menu-btn" class="icon-btn" onclick="app.toggleSidebar()">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
             </button>
+            <h1 class="logo">Golfly</h1>
+            <div style="width:40px;"></div> <!-- Spacer -->
         </header>
+
+        <!-- User Sidebar Drawer -->
+        <div id="user-sidebar" class="sidebar-drawer">
+            <div class="sidebar-header">
+                <div style="font-size:3rem; margin-bottom:12px;">👤</div>
+                <h3 id="user-display-email">Usuário</h3>
+                <p id="user-display-role" style="font-size:0.8rem; color:var(--text-secondary);">Jogador</p>
+            </div>
+            <div class="sidebar-content">
+                <button class="menu-item" onclick="app.navigate('view-history')">📊 Meu Histórico</button>
+                <button class="menu-item" onclick="app.navigate('view-courses')">⛳ Meus Campos</button>
+                <div style="flex:1;"></div>
+                <button class="menu-item logout-btn" onclick="AuthApp.logout()">🚪 Sair da Conta</button>
+            </div>
+        </div>
+        <div id="sidebar-overlay" class="sidebar-overlay" onclick="app.toggleSidebar()"></div>
 
         <!-- Main Content Area -->
         <main id="main-content">
@@ -66,9 +83,22 @@
             <section id="view-home" class="view hidden">
                 <div class="hero-section">
                     <h2>Pronto para jogar?</h2>
-                    <p>Gerencie seus campos, acompanhe seus jogos e analise suas estatísticas.</p>
+                    <p>Acompanhe seus jogos e analise suas estatísticas.</p>
                 </div>
-                
+
+                <!-- Active Match Card (Contextual) -->
+                <div id="active-match-card" style="display:none; margin-bottom:24px;">
+                    <div class="primary-card" style="background:linear-gradient(135deg, var(--bg-secondary), var(--accent-glow)); border-color:var(--accent-primary);" onclick="ScorecardApp.resumeActive()">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <div style="text-align:left;">
+                                <h3 id="active-match-course" style="font-size:1.2rem; margin-bottom:4px;">Campo Ativo</h3>
+                                <p style="color:var(--text-primary); font-size:0.9rem;">Buraco <span id="active-match-hole">1</span> • Em Progresso</p>
+                            </div>
+                            <button class="icon-btn" style="background:var(--accent-primary); border-radius:12px; padding:8px 16px; color:white; font-weight:700; width:auto; height:auto; font-size:0.8rem;">RETOMAR</button>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="action-grid">
                     <button class="primary-card" onclick="app.navigate('view-new-match')">
                         <div class="card-icon">⛳</div>
@@ -145,7 +175,11 @@
                     </div>
 
                     <button class="primary-card" id="btn-save-progress" style="width:100%; text-align:center; background:var(--accent-primary); color:#fff;" onclick="app.saveMappingProgress()">
-                        Salvar BURACO e Fechar
+                        Salvar BURACO e Avançar
+                    </button>
+
+                    <button class="secondary-card" id="btn-download-map" style="width:100%; text-align:center; margin-top:12px; font-size:0.9rem;" onclick="app.downloadOfflineMap()">
+                        📥 Baixar Mapa Offline do Campo
                     </button>
                 </div>
             </section>
@@ -161,12 +195,24 @@
                         <option value="">Carregando...</option>
                     </select>
 
-                    <label style="margin-top:16px;">Modo de Jogo</label>
-                    <select id="match-balls-multiplier" style="padding:16px;border-radius:12px;background:var(--bg-secondary);color:white;border:1px solid var(--border-subtle);font-size:1rem;">
-                        <option value="1">Normal (1 Bola por Jogador)</option>
-                        <option value="2">2 Bolas Simultâneas por Jogador</option>
-                        <option value="3">3 Bolas Simultâneas por Jogador</option>
-                    </select>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:16px;">
+                        <div class="form-group">
+                            <label>Bolas / Jogador</label>
+                            <select id="match-balls-multiplier" style="width:100%; padding:14px; border-radius:12px; background:var(--bg-secondary); color:white; border:1px solid var(--border-subtle); margin-top:8px;">
+                                <option value="1">1 Bola</option>
+                                <option value="2">2 Bolas</option>
+                                <option value="3">3 Bolas</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Rodadas (Voltas)</label>
+                            <select id="match-rounds" style="width:100%; padding:14px; border-radius:12px; background:var(--bg-secondary); color:white; border:1px solid var(--border-subtle); margin-top:8px;">
+                                <option value="1" selected>1 Volta</option>
+                                <option value="2">2 Voltas</option>
+                                <option value="3">3 Voltas</option>
+                            </select>
+                        </div>
+                    </div>
 
                     <label style="margin-top:16px;">Jogadores & Handcap</label>
                     <div id="players-list" style="display:flex;flex-direction:column;gap:8px;"></div>
@@ -209,14 +255,14 @@
                     <!-- Players Score UI will be injected here -->
                 </div>              </div>
 
-                <div style="display:flex;justify-content:space-between;gap:16px;margin-bottom:32px;">
-                     <button class="secondary-card" style="flex:1;text-align:center;padding:16px;" onclick="ScorecardApp.prevHole()">Anterior</button>
-                     <button class="primary-card" style="flex:1;text-align:center;padding:16px;background:var(--accent-primary);" onclick="ScorecardApp.nextHole()">Próximo</button>
+                <div style="display:flex;justify-content:space-between;gap:12px;margin-bottom:32px;">
+                     <button class="secondary-card" style="flex:1;text-align:center;padding:16px;background:var(--bg-glass);" onclick="ScorecardApp.saveAndExit()">
+                         💾 Pausar
+                     </button>
+                     <button class="primary-card" style="flex:1;text-align:center;padding:16px;background:var(--accent-primary);color:white;font-weight:700;" onclick="ScorecardApp.confirmFinishMatch()">
+                         🏆 Finalizar
+                     </button>
                 </div>
-                
-                <button class="secondary-card" style="width:100%;text-align:center;border-color:var(--danger);color:var(--danger);" onclick="ScorecardApp.finishMatch()">
-                     Finalizar Partida Agora
-                </button>
             </section>
 
             <section id="view-history" class="view hidden">

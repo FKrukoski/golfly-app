@@ -18,6 +18,8 @@ window.GolfMap = (function() {
     let targetMarker = null;
     let scorecardGreenCenter = null;
     let layupPolyline = null;
+    let offlineLayer = null;
+    let tileLayer = null;
 
     function initMap(containerId, initialCenter = [-23.5505, -46.6333]) {
         setupLeaflet(containerId, initialCenter);
@@ -47,6 +49,45 @@ window.GolfMap = (function() {
             attribution: 'Tiles &copy; Esri',
             maxZoom: 20
         }).addTo(mapInstance);
+    }
+
+    function setOfflineOverlay(imageUrl, bounds) {
+        if (!mapInstance) return;
+        if (offlineLayer) mapInstance.removeLayer(offlineLayer);
+        
+        offlineLayer = L.imageOverlay(imageUrl, bounds, {
+            opacity: 1,
+            interactive: false
+        }).addTo(mapInstance);
+        
+        // Push offline layer to back so pins are above it
+        offlineLayer.getElement()?.style.setProperty('z-index', '0');
+        
+        if (bounds) mapInstance.fitBounds(bounds);
+    }
+
+    function getCourseBounds(holes) {
+        if (!holes || holes.length === 0) return null;
+        let lats = [], lngs = [];
+        holes.forEach(h => {
+             if (h.points?.greenCenter) {
+                 lats.push(h.points.greenCenter.lat);
+                 lngs.push(h.points.greenCenter.lng);
+             }
+        });
+        if (lats.length === 0) return null;
+        
+        let minLat = Math.min(...lats);
+        let maxLat = Math.max(...lats);
+        let minLng = Math.min(...lngs);
+        let maxLng = Math.max(...lngs);
+        
+        // Add 500 yards margin (~0.004 degrees lat/lng)
+        const margin = 0.005; // ~500m
+        return [
+            [minLat - margin, minLng - margin],
+            [maxLat + margin, maxLng + margin]
+        ];
     }
 
     function resetHolePoints() {
@@ -135,9 +176,13 @@ window.GolfMap = (function() {
          return !!mapInstance;
     }
 
-    function initScorecardMap(containerId) {
+    function initScorecardMap(containerId, offlineMap = null) {
          setupLeaflet(containerId, [-23.5505, -46.6333]);
          
+         if (offlineMap && offlineMap.image && offlineMap.bounds) {
+             setOfflineOverlay(offlineMap.image, offlineMap.bounds);
+         }
+
          // Start GPS
          if ('geolocation' in navigator) {
              locationWatchId = navigator.geolocation.watchPosition(
@@ -265,6 +310,8 @@ window.GolfMap = (function() {
         initScorecardMap,
         loadScorecardGreen,
         centerOnUser,
-        setCenter
+        setCenter,
+        getCourseBounds,
+        setOfflineOverlay
     };
 })();

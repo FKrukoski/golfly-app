@@ -11,31 +11,36 @@ const app = (function() {
     async function init() {
          console.log("App initializing...");
          
-         // Supabase Auth Check
          if (window.AuthApp) {
              const loggedIn = await window.AuthApp.checkSession();
              if (!loggedIn) {
                   navigate('view-auth');
-                  return; // Stop initialization, force login
+                  return; 
+             }
+             const user = window.AuthApp.getUser();
+             if(user) {
+                 document.getElementById('user-display-email').innerText = user.email;
              }
          }
         
-        // Attempt to resume active match if it exists
-        const resumed = await ScorecardApp.resumeActive();
-        if (!resumed) {
-             navigate('view-home');
+        // Check for active match to show the context card on Home
+        const active = await db.getActiveMatch();
+        if (active) {
+            document.getElementById('active-match-card').style.display = 'block';
+            document.getElementById('active-match-course').innerText = active.courseName;
+            document.getElementById('active-match-hole').innerText = active.currentHole;
+        } else {
+            document.getElementById('active-match-card').style.display = 'none';
         }
-        
-        // Listeners
-        document.getElementById('nav-menu-btn').addEventListener('click', () => {
-             alert('Menu em breve!');
-        });
-        
+
+        navigate('view-home');
+        db.syncPullCourses();
+
         // Register Service Worker for PWA Offline mode
         if ('serviceWorker' in navigator) {
              try {
                   const registration = await navigator.serviceWorker.register('sw.js');
-                  console.log('ServiceWorker registered with scope:', registration.scope);
+                  console.log('ServiceWorker registered:', registration.scope);
              } catch (e) {
                   console.error('ServiceWorker registration failed:', e);
              }
@@ -73,6 +78,13 @@ const app = (function() {
         } else if (viewId === 'view-history' && previousView !== 'view-history') {
              setTimeout(() => HistoryApp.initHistoryView(), 0);
         }
+    }
+
+    function toggleSidebar() {
+        const sidebar = document.getElementById('user-sidebar');
+        const overlay = document.getElementById('sidebar-overlay');
+        sidebar.classList.toggle('open');
+        overlay.classList.toggle('show');
     }
 
     // --- Course Views Logic ---
@@ -483,6 +495,26 @@ const app = (function() {
     }
 
     // Export public methods
+    async function downloadOfflineMap() {
+        if (!activeMappingCourse || !activeMappingCourse.holes) return;
+        const bounds = window.GolfMap.getCourseBounds(activeMappingCourse.holes);
+        if (!bounds) return;
+
+        const staticUrl = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/export?bbox=${bounds[0][1]},${bounds[0][0]},${bounds[1][1]},${bounds[1][0]}&bboxSR=4326&size=1024,1024&format=png&f=image`;
+        
+        try {
+            const resp = await fetch(staticUrl);
+            const blob = await resp.blob();
+            const reader = new FileReader();
+            reader.onloadend = async () => {
+                activeMappingCourse.offlineMap = { image: reader.result, bounds: bounds };
+                await db.saveCourse(activeMappingCourse);
+                alert("Mapa Offline Calibrado e Salvo!");
+            };
+            reader.readAsDataURL(blob);
+        } catch(e) { alert("Erro ao baixar mapa."); }
+    }
+
     return {
         init,
         navigate,
@@ -495,7 +527,9 @@ const app = (function() {
         applyManualCoords,
         handleCsvUpload,
         setManualPar,
-        processAuth
+        processAuth,
+        toggleSidebar,
+        downloadOfflineMap
     };
 })();
 

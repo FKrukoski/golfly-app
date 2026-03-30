@@ -30,6 +30,7 @@ window.db = (function() {
                     physical_holes: course.physicalHoles || 18,
                     total_par: course.totalPar || 0,
                     holes: course.holes || [],
+                    offline_map: course.offlineMap || null,
                     created_by: user.id
                 };
                 window.supabaseClient.from('courses').upsert(payload, { onConflict: 'id' }).then().catch(e => console.error(e));
@@ -69,6 +70,15 @@ window.db = (function() {
             }
             return match;
         },
+        async deleteMatch(id) {
+            await matchStore.removeItem(id);
+            if (window.AuthApp && window.AuthApp.getUser() && window.supabaseClient) {
+                window.supabaseClient.from('matches').delete().eq('id', id).then().catch(e => console.error(e));
+            }
+        },
+        async getMatch(id) {
+            return await matchStore.getItem(id);
+        },
 
         // Active Match State
         async getActiveMatch() {
@@ -99,7 +109,8 @@ window.db = (function() {
                              city: row.city,
                              physicalHoles: row.physical_holes,
                              totalPar: row.total_par,
-                             holes: row.holes || []
+                             holes: row.holes || [],
+                             offlineMap: row.offline_map || null
                          };
                          await courseStore.setItem(row.id, localObj);
                      }
