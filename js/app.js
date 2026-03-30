@@ -7,6 +7,7 @@ const app = (function() {
 
     let activeMappingCourse = null;
     let currentMappingHoleIdx = 1;
+    let deferredPrompt = null;
 
     async function init() {
          console.log("App initializing...");
@@ -36,6 +37,21 @@ const app = (function() {
         navigate('view-home');
         db.syncPullCourses();
 
+        // PWA Install Logic
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            const installBtn = document.getElementById('pwa-install-btn');
+            if (installBtn) installBtn.style.display = 'block';
+        });
+
+        window.addEventListener('appinstalled', () => {
+            deferredPrompt = null;
+            const installBtn = document.getElementById('pwa-install-btn');
+            if (installBtn) installBtn.style.display = 'none';
+            console.log('PWA instalado com sucesso!');
+        });
+
         // Register Service Worker for PWA Offline mode
         if ('serviceWorker' in navigator) {
              try {
@@ -45,6 +61,16 @@ const app = (function() {
                   console.error('ServiceWorker registration failed:', e);
              }
         }
+    }
+
+    async function installPwa() {
+        if (!deferredPrompt) return;
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        console.log(`User response to install: ${outcome}`);
+        deferredPrompt = null;
+        const installBtn = document.getElementById('pwa-install-btn');
+        if (installBtn) installBtn.style.display = 'none';
     }
 
     function navigate(viewId) {
@@ -491,19 +517,52 @@ const app = (function() {
         const bounds = window.GolfMap.getCourseBounds(activeMappingCourse.holes);
         if (!bounds) return;
 
+        const progressContainer = document.getElementById('map-progress-container');
+        const progressBar = document.getElementById('map-progress-bar');
+        const progressPercent = document.getElementById('map-progress-percent');
+        
+        progressContainer.style.display = 'block';
+        progressBar.style.width = '0%';
+        progressPercent.innerText = '0%';
+
         const staticUrl = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/export?bbox=${bounds[0][1]},${bounds[0][0]},${bounds[1][1]},${bounds[1][0]}&bboxSR=4326&size=1024,1024&format=png&f=image`;
         
+        // Simulating progress while fetching
+        let progress = 0;
+        const interval = setInterval(() => {
+            if (progress < 90) {
+                progress += Math.random() * 15;
+                if (progress > 90) progress = 90;
+                progressBar.style.width = `${Math.round(progress)}%`;
+                progressPercent.innerText = `${Math.round(progress)}%`;
+            }
+        }, 300);
+
         try {
             const resp = await fetch(staticUrl);
+            if (!resp.ok) throw new Error("Download failed");
+            
             const blob = await resp.blob();
             const reader = new FileReader();
             reader.onloadend = async () => {
+                clearInterval(interval);
+                progressBar.style.width = '100%';
+                progressPercent.innerText = '100%';
+                
                 activeMappingCourse.offlineMap = { image: reader.result, bounds: bounds };
                 await db.saveCourse(activeMappingCourse);
-                alert("Mapa Offline Calibrado e Salvo!");
+                
+                setTimeout(() => {
+                    alert("Mapa Offline Calibrado e Salvo!");
+                    progressContainer.style.display = 'none';
+                }, 500);
             };
             reader.readAsDataURL(blob);
-        } catch(e) { alert("Erro ao baixar mapa."); }
+        } catch(e) { 
+            clearInterval(interval);
+            progressContainer.style.display = 'none';
+            alert("Erro ao baixar mapa."); 
+        }
     }
 
     return {
@@ -520,7 +579,8 @@ const app = (function() {
         setManualPar,
         processAuth,
         toggleSidebar,
-        downloadOfflineMap
+        downloadOfflineMap,
+        installPwa
     };
 })();
 
