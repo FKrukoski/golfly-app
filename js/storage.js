@@ -118,6 +118,51 @@ window.db = (function() {
              } catch(e) {
                  console.error("Erro no Pull Supabase:", e);
              }
+        },
+
+        // Request Management
+        async sendCourseRequest(courseName, location) {
+            if (!window.supabaseClient || !window.AuthApp.getUser()) return;
+            const user = window.AuthApp.getUser();
+            await window.supabaseClient.from('course_requests').insert({
+                user_id: user.id,
+                course_name: courseName,
+                location: location
+            });
+        },
+
+        async sendAdminRequest(reason) {
+           if (!window.supabaseClient || !window.AuthApp.getUser()) return;
+           const user = window.AuthApp.getUser();
+           await window.supabaseClient.from('admin_requests').insert({
+               user_id: user.id,
+               reason: reason
+           });
+        },
+
+        async getPendingRequests(table) {
+            if (!window.AuthApp.isAdmin()) return [];
+            const { data } = await window.supabaseClient
+               .from(table)
+               .select('*, profiles(email)')
+               .eq('status', 'pending');
+            return data || [];
+        },
+
+        async updateRequestStatus(table, id, status, userId = null) {
+            if (!window.AuthApp.isAdmin()) return;
+            const { error } = await window.supabaseClient
+               .from(table)
+               .update({ status })
+               .eq('id', id);
+            
+            // If admin promotion is approved, update the profile role
+            if (!error && table === 'admin_requests' && status === 'approved' && userId) {
+                await window.supabaseClient
+                   .from('profiles')
+                   .update({ role: 'admin' })
+                   .eq('id', userId);
+            }
         }
     };
 })();

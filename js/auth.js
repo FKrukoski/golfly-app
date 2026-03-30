@@ -71,14 +71,18 @@ window.AuthApp = (function() {
         return currentUser;
     }
 
-    function getProfile() {
-        return userProfile;
+    function getRole() {
+        return userProfile ? userProfile.role : 'user';
+    }
+
+    function isAdmin() {
+        return getRole() === 'admin';
     }
 
     function showLoading(show) {
         const btn = document.getElementById('auth-action-btn');
         if(btn) {
-            btn.innerText = show ? 'Processando...' : 'Confirmar';
+            btn.innerText = show ? 'Processando...' : 'Acessar';
             btn.disabled = show;
         }
     }
@@ -89,6 +93,7 @@ window.AuthApp = (function() {
         register,
         logout,
         getUser,
-        getProfile
+        getRole,
+        isAdmin
     };
 })();
