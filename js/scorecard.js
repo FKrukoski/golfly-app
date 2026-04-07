@@ -127,7 +127,7 @@ window.ScorecardApp = (function() {
               if (holeData && holeData.points && holeData.points.greenCenter) {
                    window.GolfMap.loadScorecardGreen(holeData.points.greenCenter.lat, holeData.points.greenCenter.lng);
               }
-              window.GolfMap.centerOnUser();
+              window.GolfMap.centerOnGreen();
           }
 
           renderScoreCounters();
@@ -140,19 +140,20 @@ window.ScorecardApp = (function() {
          if (isMapVisible) {
              mapContainer.style.display = 'block';
              const course = await db.getCourse(activeMatchState.courseId);
+             const physHole = ((activeMatchState.currentHole - 1) % activeMatchState.physicalHoles) + 1;
              if (!window.GolfMap.isInitialized()) {
                   window.GolfMap.initScorecardMap('scorecard-map-container', course?.offlineMap);
              }
              
              // Extract green data 
              if (course && course.holes) {
-                  const holeData = course.holes.find(h => h.number === activeMappingHoleIdx || activeMatchState.currentHole);
+                  const holeData = course.holes.find(h => h.number === physHole);
                   if (holeData && holeData.points && holeData.points.greenCenter) {
                        window.GolfMap.loadScorecardGreen(holeData.points.greenCenter.lat, holeData.points.greenCenter.lng);
                   }
              }
 
-             window.GolfMap.centerOnUser();
+             window.GolfMap.centerOnGreen();
          } else {
              mapContainer.style.display = 'none';
          }

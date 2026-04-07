@@ -234,14 +234,20 @@ window.GolfMap = (function() {
 
     function centerOnUser() {
          if (userLocation && mapInstance) {
-             if (scorecardGreenCenter) {
-                 fitHoleView();
-             } else {
-                 mapInstance.setView(userLocation, 18);
-             }
+             mapInstance.setView(userLocation, 19);
              updateDistanceHUD(); 
          } else {
              alert('Aguardando sinal GPS...');
+         }
+    }
+
+    function centerOnGreen() {
+         if (scorecardGreenCenter && mapInstance) {
+             mapInstance.setView(scorecardGreenCenter, 18);
+             updateDistanceHUD();
+         } else {
+             // Fallback to user if no green
+             centerOnUser();
          }
     }
 
@@ -403,6 +409,7 @@ window.GolfMap = (function() {
         initScorecardMap,
         loadScorecardGreen,
         centerOnUser,
+        centerOnGreen,
         fitHoleView,
         setCenter,
         getCourseBounds,
