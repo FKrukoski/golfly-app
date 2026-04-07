@@ -234,12 +234,41 @@ window.GolfMap = (function() {
 
     function centerOnUser() {
          if (userLocation && mapInstance) {
-             mapInstance.setView(userLocation, 18);
-             updateDistanceHUD(); // Re-trigger rotate
+             if (scorecardGreenCenter) {
+                 fitHoleView();
+             } else {
+                 mapInstance.setView(userLocation, 18);
+             }
+             updateDistanceHUD(); 
          } else {
              alert('Aguardando sinal GPS...');
          }
     }
+
+    function fitHoleView() {
+        if (!userLocation || !scorecardGreenCenter || !mapInstance) return;
+        
+        const userL = L.latLng(userLocation[0], userLocation[1]);
+        const greenL = L.latLng(scorecardGreenCenter.lat, scorecardGreenCenter.lng);
+        
+        // 1. Calculate and set bearing (User -> Green is "UP")
+        const bearing = calculateBearing(userL.lat, userL.lng, greenL.lat, greenL.lng);
+        if (typeof mapInstance.setBearing === 'function') {
+            mapInstance.setBearing(bearing);
+        }
+
+        // 2. Fit bounds with asymmetric padding to push Green to the TOP
+        // padding: [50, 50, 150, 50] -> [top, right, bottom, left] in standard Leaflet order
+        // In Leaflet-rotate, we might need to use simple padding if asymmetric is buggy, 
+        // but let's try the standard way first.
+        mapInstance.fitBounds([userL, greenL], {
+            paddingTopLeft: [40, 60], // More padding at top might push it down... wait.
+            paddingBottomRight: [40, 160], // This pushes points AWAY from bottom.
+            maxZoom: 19,
+            animate: true
+        });
+    }
+
 
     function setCenter(lat, lng) {
          if (mapInstance) {
@@ -374,6 +403,7 @@ window.GolfMap = (function() {
         initScorecardMap,
         loadScorecardGreen,
         centerOnUser,
+        fitHoleView,
         setCenter,
         getCourseBounds,
         setOfflineOverlay,
