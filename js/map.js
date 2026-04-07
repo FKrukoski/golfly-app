@@ -20,6 +20,12 @@ window.GolfMap = (function() {
     let layupPolyline = null;
     let offlineLayer = null;
     let tileLayer = null;
+    let mapSelection = {
+        layup: true,
+        atual: true,
+        green: true
+    };
+
 
     function initMap(containerId, initialCenter = [-23.5505, -46.6333]) {
         setupLeaflet(containerId, initialCenter);
@@ -267,37 +273,95 @@ window.GolfMap = (function() {
       return (brng * 180 / Math.PI + 360) % 360;
     }
 
+    function toggleSelection(type) {
+         mapSelection[type] = !mapSelection[type];
+         const btn = document.getElementById(`btn-map-${type}`);
+         if (btn) {
+             if (mapSelection[type]) btn.classList.add('active');
+             else btn.classList.remove('active');
+         }
+         
+         // Update layup marker visibility if it's the layup being toggled
+         if (type === 'layup' && targetMarker) {
+             if (mapSelection.layup) targetMarker.addTo(mapInstance);
+             else mapInstance.removeLayer(targetMarker);
+         }
+         
+         updateDistanceHUD();
+    }
+
     function updateDistanceHUD() {
-         if (!userLocation || !scorecardGreenCenter) return;
+         if (!userLocation || !scorecardGreenCenter || !mapInstance) return;
          
          const userL = L.latLng(userLocation[0], userLocation[1]);
          
-         // Auto Rotate logic
-         if (mapInstance && typeof mapInstance.setBearing === 'function') {
+         // Auto Rotate logic (always based on User -> Green for orientation)
+         if (typeof mapInstance.setBearing === 'function') {
              const bearing = calculateBearing(userL.lat, userL.lng, scorecardGreenCenter.lat, scorecardGreenCenter.lng);
              mapInstance.setBearing(bearing);
          }
 
          if (layupPolyline) mapInstance.removeLayer(layupPolyline);
 
-         if (!targetMarker) {
-             const distToGreen = Math.round(userL.distanceTo(scorecardGreenCenter) * 1.09361);
-             document.getElementById('gps-distance-hud').innerHTML = `🚩 Para o Green: <b>${distToGreen} yds</b>`;
-             document.getElementById('gps-distance-hud').style.display = 'block';
-             
-             layupPolyline = L.polyline([userL, scorecardGreenCenter], {color: '#10B981', weight: 4, opacity: 0.8}).addTo(mapInstance);
-             return;
-         }
-         
-         // Layup Logic
-         const layupL = targetMarker.getLatLng();
-         const layupYds = Math.round(userL.distanceTo(layupL) * 1.09361);
-         const restYds = Math.round(layupL.distanceTo(scorecardGreenCenter) * 1.09361);
-         
-         layupPolyline = L.polyline([userL, layupL, scorecardGreenCenter], {color: '#F59E0B', weight: 4, dashArray: '8, 8'}).addTo(mapInstance);
+         let hudContent = [];
+         let polylinePoints = [];
+         let polylineColor = '#10B981'; // Green by default
+         let polylineDash = '';
 
-         document.getElementById('gps-distance-hud').innerHTML = `L: <b>${layupYds}y</b> | 🚩: <b>${restYds}y</b>`;
-         document.getElementById('gps-distance-hud').style.display = 'block';
+         const hasLayup = targetMarker && mapSelection.layup;
+         const showAtual = mapSelection.atual;
+         const showGreen = mapSelection.green;
+         const showLayup = mapSelection.layup && targetMarker;
+
+         // Logic based on requirements:
+         // 1. All three selected (and layup exists)
+         if (showAtual && showLayup && showGreen) {
+             const layupL = targetMarker.getLatLng();
+             const layupYds = Math.round(userL.distanceTo(layupL) * 1.09361);
+             const restYds = Math.round(layupL.distanceTo(scorecardGreenCenter) * 1.09361);
+             hudContent.push(`L: <b>${layupYds}y</b>`, `🚩: <b>${restYds}y</b>`);
+             polylinePoints = [userL, layupL, scorecardGreenCenter];
+             polylineColor = '#F59E0B'; // Orange for layup path
+             polylineDash = '8, 8';
+         } 
+         // 2. Only Layup and Atual
+         else if (showAtual && showLayup) {
+             const layupL = targetMarker.getLatLng();
+             const dist = Math.round(userL.distanceTo(layupL) * 1.09361);
+             hudContent.push(`Pos ➔ Layup: <b>${dist}y</b>`);
+             polylinePoints = [userL, layupL];
+             polylineColor = '#F59E0B';
+         }
+         // 3. Only Layup and Green
+         else if (showLayup && showGreen) {
+             const layupL = targetMarker.getLatLng();
+             const dist = Math.round(layupL.distanceTo(scorecardGreenCenter) * 1.09361);
+             hudContent.push(`Layup ➔ Green: <b>${dist}y</b>`);
+             polylinePoints = [layupL, scorecardGreenCenter];
+             polylineColor = '#10B981';
+         }
+         // 4. Only Atual and Green
+         else if (showAtual && showGreen) {
+             const dist = Math.round(userL.distanceTo(scorecardGreenCenter) * 1.09361);
+             hudContent.push(`🚩 Green: <b>${dist}y</b>`);
+             polylinePoints = [userL, scorecardGreenCenter];
+             polylineColor = '#10B981';
+         }
+
+         // Update UI
+         const hud = document.getElementById('gps-distance-hud');
+         if (hudContent.length > 0) {
+             hud.innerHTML = hudContent.join(' | ');
+             hud.style.display = 'block';
+             layupPolyline = L.polyline(polylinePoints, {
+                 color: polylineColor, 
+                 weight: 4, 
+                 opacity: 0.8,
+                 dashArray: polylineDash
+             }).addTo(mapInstance);
+         } else {
+             hud.style.display = 'none';
+         }
     }
 
     return {
@@ -312,6 +376,7 @@ window.GolfMap = (function() {
         centerOnUser,
         setCenter,
         getCourseBounds,
-        setOfflineOverlay
+        setOfflineOverlay,
+        toggleSelection
     };
 })();

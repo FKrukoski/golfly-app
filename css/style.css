@@ -274,3 +274,21 @@ h1, h2, h3, h4 {
   margin-top: 20px;
 }
 
+/* Map Navigation Selectors */
+.map-nav-btn {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.5);
+  transition: all var(--transition-fast);
+}
+
+.map-nav-btn.active {
+  background: var(--accent-primary) !important;
+  color: white !important;
+  box-shadow: 0 4px 12px var(--accent-glow);
+}
+
+.map-nav-btn:active {
+  transform: scale(0.9);
+}
+
+
