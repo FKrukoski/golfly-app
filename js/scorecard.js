@@ -49,14 +49,26 @@ window.ScorecardApp = (function() {
         const name = inputName.value.trim();
         const hcp = parseInt(inputHcp.value) || 0;
         
-        if (name && matchConfig.players.length < 4) {
-             matchConfig.players.push({ id: `p_${Date.now()}`, name, hcp });
-             inputName.value = '';
-             inputHcp.value = '';
-             renderPlayersList();
-        } else if (matchConfig.players.length >= 4) {
-             alert('Máximo de 4 jogadores no mesmo dispositivo (Flight).');
+        if (!name) {
+            alert('Por favor, digite o nome do jogador.');
+            return;
         }
+
+        if (matchConfig.players.length >= 4) {
+            alert('Máximo de 4 jogadores no mesmo dispositivo (Flight).');
+            return;
+        }
+
+        // Check for duplicate name
+        if (matchConfig.players.some(p => p.name.toLowerCase() === name.toLowerCase())) {
+            alert('Já existe um jogador com este nome.');
+            return;
+        }
+
+        matchConfig.players.push({ id: `p_${Date.now()}`, name, hcp });
+        inputName.value = '';
+        inputHcp.value = '';
+        renderPlayersList();
     }
 
     function removePlayer(id) {

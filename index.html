@@ -237,10 +237,13 @@
                     <label style="margin-top:16px;">Jogadores & Handcap</label>
                     <div id="players-list" style="display:flex;flex-direction:column;gap:8px;"></div>
                     
-                    <div style="display:flex;gap:8px;margin-top:8px;">
-                        <input type="text" id="new-player-name" placeholder="Nome do Jogador" style="flex:2;padding:12px;border-radius:12px;background:var(--bg-secondary);border:1px solid var(--border-subtle);color:white;" />
-                        <input type="number" id="new-player-hcp" placeholder="HCP (ex: 12)" style="flex:1;padding:12px;border-radius:12px;background:var(--bg-secondary);border:1px solid var(--border-subtle);color:white;" />
-                        <button onclick="ScorecardApp.addPlayer()" style="background:var(--accent-primary);color:white;border:none;padding:0 20px;border-radius:12px;font-weight:600;">Add</button>
+                    <div style="background:var(--bg-primary); padding:16px; border-radius:16px; border:1px solid var(--border-subtle); margin-top:16px;">
+                        <label style="font-size:0.8rem; color:var(--text-secondary); margin-bottom:12px; display:block;">Adicionar Jogador ao Flight</label>
+                        <div style="display:flex; gap:8px;">
+                            <input type="text" id="new-player-name" placeholder="Nome" style="flex:2; padding:12px; border-radius:12px; background:var(--bg-secondary); border:1px solid var(--border-subtle); color:white; font-size:0.9rem;" />
+                            <input type="number" id="new-player-hcp" placeholder="HCP" style="flex:1; padding:12px; border-radius:12px; background:var(--bg-secondary); border:1px solid var(--border-subtle); color:white; font-size:0.9rem;" />
+                            <button onclick="ScorecardApp.addPlayer()" style="background:var(--accent-primary); color:white; border:none; padding:0 20px; border-radius:12px; font-weight:700; cursor:pointer; box-shadow:0 4px 12px var(--accent-glow);">Add</button>
+                        </div>
                     </div>
 
                     <button class="primary-card" style="text-align:center;margin-top:24px;background:var(--accent-primary);color:#fff;" onclick="ScorecardApp.startMatch()">
@@ -359,6 +362,26 @@
                       <!-- Requests will be loaded here -->
                       <p style="text-align:center;color:var(--text-secondary);">Carregando pedidos...</p>
                  </div>
+            </section>
+            
+            <!-- Match Detailed Report (Scorecard) -->
+            <section id="view-match-report" class="view hidden">
+                 <div class="view-header">
+                     <button class="icon-btn back-btn" onclick="app.navigate('view-history')">⬅</button>
+                     <h2 id="report-course-name">Relatório</h2>
+                 </div>
+                 
+                 <div id="report-summary" class="report-summary-cards">
+                      <!-- Summary cards injected here -->
+                 </div>
+
+                 <div id="report-scorecard-container">
+                      <!-- Scorecard table injected here -->
+                 </div>
+
+                 <button class="secondary-card" style="width:100%; text-align:center; margin-top:24px; color:var(--text-secondary);" onclick="app.navigate('view-history')">
+                      Voltar ao Histórico
+                 </button>
             </section>
 
         </main>
