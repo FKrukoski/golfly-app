@@ -234,15 +234,14 @@
                         </div>
                     </div>
 
-                    <label style="margin-top:16px;">Jogadores & Handcap</label>
-                    <div id="players-list" style="display:flex;flex-direction:column;gap:8px;"></div>
-                    
-                    <div style="background:var(--bg-primary); padding:16px; border-radius:16px; border:1px solid var(--border-subtle); margin-top:16px;">
-                        <label style="font-size:0.8rem; color:var(--text-secondary); margin-bottom:12px; display:block;">Adicionar Jogador ao Flight</label>
-                        <div style="display:flex; gap:8px;">
-                            <input type="text" id="new-player-name" placeholder="Nome" style="flex:2; padding:12px; border-radius:12px; background:var(--bg-secondary); border:1px solid var(--border-subtle); color:white; font-size:0.9rem;" />
-                            <input type="number" id="new-player-hcp" placeholder="HCP" style="flex:1; padding:12px; border-radius:12px; background:var(--bg-secondary); border:1px solid var(--border-subtle); color:white; font-size:0.9rem;" />
-                            <button onclick="ScorecardApp.addPlayer()" style="background:var(--accent-primary); color:white; border:none; padding:0 20px; border-radius:12px; font-weight:700; cursor:pointer; box-shadow:0 4px 12px var(--accent-glow);">Add</button>
+                    <div class="form-group" style="margin-top:16px;">
+                        <label>Jogadores no Flight</label>
+                        <div id="players-list" style="display:flex;flex-direction:column;gap:8px;margin-top:12px;"></div>
+                        
+                        <div style="display:flex; gap:8px; align-items:center; margin-top:24px; padding-top:16px; border-top:1px solid var(--border-subtle);">
+                            <input type="text" id="new-player-name" placeholder="Nome do Jogador" style="flex:3; padding:14px; border-radius:12px; background:var(--bg-secondary); border:1px solid var(--border-subtle); color:white; font-size:1rem;" />
+                            <input type="number" id="new-player-hcp" placeholder="HCP" style="flex:1; padding:14px; border-radius:12px; background:var(--bg-secondary); border:1px solid var(--border-subtle); color:white; font-size:1rem;" />
+                            <button onclick="ScorecardApp.addPlayer()" style="background:var(--accent-primary); color:white; border:none; width:48px; height:48px; border-radius:50%; font-size:1.5rem; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0; box-shadow:0 4px 12px var(--accent-glow);">+</button>
                         </div>
                     </div>
 
