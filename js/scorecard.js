@@ -85,7 +85,10 @@ window.ScorecardApp = (function() {
          const scores = {};
          matchConfig.players.forEach(p => {
              // Create a 2D array [ball_index][hole_index]
-             scores[p.id] = Array.from({length: ballsMultiplier}, () => Array(totalHoles).fill(0));
+             // Each entry is now an object { g: greenShots, p: putts }
+             scores[p.id] = Array.from({length: ballsMultiplier}, () => 
+                 Array.from({length: totalHoles}, () => ({ g: 0, p: 0 }))
+             );
          });
 
          activeMatchState = {
@@ -167,33 +170,48 @@ window.ScorecardApp = (function() {
               
               let ballsHtml = '';
               let totalGross = 0;
-              
-              for (let b = 0; b < activeMatchState.ballsMultiplier; b++) {
-                  const score = activeMatchState.scores[p.id][b][holeIdx] || 0;
-                  const displayScore = score === 0 ? '-' : score;
-                  
-                  // Compute total gross across all logical holes and all balls
-                  activeMatchState.scores[p.id][b].forEach(s => totalGross += s);
+                            for (let b = 0; b < activeMatchState.ballsMultiplier; b++) {
+                   const scoreObj = activeMatchState.scores[p.id][b][holeIdx] || { g: 0, p: 0 };
+                   const displayG = scoreObj.g === 0 ? '-' : scoreObj.g;
+                   const displayP = scoreObj.p === 0 ? '-' : scoreObj.p;
+                   
+                   // Compute total gross across all logical holes and all balls
+                   activeMatchState.scores[p.id][b].forEach(s => {
+                       totalGross += (s.g || 0) + (s.p || 0);
+                   });
 
-                  ballsHtml += `
-                  <div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px;background:var(--bg-primary);border-radius:8px;padding:8px 12px;border:1px solid var(--border-subtle);">
-                      <span style="font-size:0.9rem;color:var(--text-secondary);">Bola ${b + 1}</span>
-                      <div style="display:flex;align-items:center;gap:12px;">
-                          <button class="icon-btn" style="background:var(--bg-secondary);width:40px;height:40px;font-size:1.5rem;" onclick="ScorecardApp.updateScore('${p.id}', ${b}, -1)">-</button>
-                          <span style="font-size:1.8rem;font-weight:700;width:30px;text-align:center;">${displayScore}</span>
-                          <button class="icon-btn" style="background:var(--bg-secondary);width:40px;height:40px;font-size:1.5rem;" onclick="ScorecardApp.updateScore('${p.id}', ${b}, 1)">+</button>
-                      </div>
-                  </div>`;
-              }
+                   ballsHtml += `
+                   <div style="margin-top:12px; background:var(--bg-primary); border-radius:12px; padding:16px; border:1px solid var(--border-subtle);">
+                       <span style="font-size:0.8rem; color:var(--accent-primary); font-weight:700; text-transform:uppercase; letter-spacing:1px;">Bola ${b + 1}</span>
+                       
+                       <div style="display:flex; align-items:center; justify-content:space-between; margin-top:12px;">
+                           <span style="font-size:0.9rem; color:var(--text-secondary);">Até o Green</span>
+                           <div style="display:flex; align-items:center; gap:12px;">
+                               <button class="icon-btn" style="background:var(--bg-secondary); width:36px; height:36px; font-size:1.2rem;" onclick="ScorecardApp.updateScore('${p.id}', ${b}, -1, 'g')">-</button>
+                               <span style="font-size:1.4rem; font-weight:700; width:30px; text-align:center;">${displayG}</span>
+                               <button class="icon-btn" style="background:var(--bg-secondary); width:36px; height:36px; font-size:1.2rem;" onclick="ScorecardApp.updateScore('${p.id}', ${b}, 1, 'g')">+</button>
+                           </div>
+                       </div>
+
+                       <div style="display:flex; align-items:center; justify-content:space-between; margin-top:12px; padding-top:12px; border-top:1px solid rgba(255,255,255,0.05);">
+                           <span style="font-size:0.9rem; color:var(--text-secondary);">Putts</span>
+                           <div style="display:flex; align-items:center; gap:12px;">
+                               <button class="icon-btn" style="background:var(--bg-secondary); width:36px; height:36px; font-size:1.2rem;" onclick="ScorecardApp.updateScore('${p.id}', ${b}, -1, 'p')">-</button>
+                               <span style="font-size:1.4rem; font-weight:700; width:30px; text-align:center;">${displayP}</span>
+                               <button class="icon-btn" style="background:var(--bg-secondary); width:36px; height:36px; font-size:1.2rem;" onclick="ScorecardApp.updateScore('${p.id}', ${b}, 1, 'p')">+</button>
+                           </div>
+                       </div>
+                   </div>`;
+               }
               
               let netScore = totalGross - (p.hcp || 0);
 
               return `
               <div class="secondary-card" style="padding:16px;">
-                   <div style="display:flex;align-items:center;justify-content:space-between;">
-                       <h3 style="font-size:1.1rem;margin-bottom:0;">${p.name}</h3>
+                   <div style="display:flex; align-items:center; justify-content:space-between;">
+                       <h3 style="font-size:1.1rem; margin-bottom:0;">${p.name}</h3>
                        <div style="text-align:right;">
-                           <p style="font-size:0.8rem;color:var(--text-secondary);">Gross: ${totalGross} | <b>Net: ${netScore}</b></p>
+                           <p style="font-size:0.8rem; color:var(--text-secondary);">Gross: ${totalGross} | <b>Net: ${netScore}</b></p>
                        </div>
                    </div>
                    ${ballsHtml}
@@ -202,13 +220,18 @@ window.ScorecardApp = (function() {
           }).join('');
      }
 
-    async function updateScore(playerId, ballIdx, delta) {
+    async function updateScore(playerId, ballIdx, delta, type = 'g') {
          const holeIdx = activeMatchState.currentHole - 1;
-         let current = activeMatchState.scores[playerId][ballIdx][holeIdx] || 0;
-         current += delta;
-         if (current < 0) current = 0;
+         let scoreObj = activeMatchState.scores[playerId][ballIdx][holeIdx];
          
-         activeMatchState.scores[playerId][ballIdx][holeIdx] = current;
+         // Fix for potential legacy or missing objects
+         if (typeof scoreObj !== 'object') {
+             scoreObj = { g: typeof scoreObj === 'number' ? scoreObj : 0, p: 0 };
+             activeMatchState.scores[playerId][ballIdx][holeIdx] = scoreObj;
+         }
+
+         scoreObj[type] = (scoreObj[type] || 0) + delta;
+         if (scoreObj[type] < 0) scoreObj[type] = 0;
          
          // Persist active match state
          await db.setActiveMatch(activeMatchState);
@@ -228,18 +251,18 @@ window.ScorecardApp = (function() {
      function prevHole() {
           if (activeMatchState.currentHole > 1) {
               activeMatchState.currentHole--;
-              db.setActiveMatch(activeMatchState);
               loadScorecardView();
           }
      }
 
      function confirmFinishMatch() {
           let incomplete = false;
-          Object.keys(activeMatchState.scores).forEach(pId => {
-               activeMatchState.scores[pId].forEach(bArr => {
-                    if (bArr.includes(0)) incomplete = true;
-               });
-          });
+           Object.keys(activeMatchState.scores).forEach(pId => {
+                activeMatchState.scores[pId].forEach(bArr => {
+                     // Incomplete if total strokes (g+p) is 0 for any hole
+                     if (bArr.some(s => (s.g + s.p) === 0)) incomplete = true;
+                });
+           });
 
           if (incomplete) {
                alert("Não é possível finalizar com buracos sem pontuação. Use 'Pausar' para sair sem concluir.");
@@ -271,6 +294,16 @@ window.ScorecardApp = (function() {
     async function resumeActive() {
          const active = await db.getActiveMatch();
          if (active) {
+             // Migration logic for old data format
+             Object.keys(active.scores).forEach(pId => {
+                 active.scores[pId].forEach(ballArray => {
+                     ballArray.forEach((s, idx) => {
+                         if (typeof s === 'number') {
+                             ballArray[idx] = { g: s, p: 0 };
+                         }
+                     });
+                 });
+             });
              activeMatchState = active;
              loadScorecardView();
              return true;
