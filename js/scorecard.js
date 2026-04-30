@@ -250,7 +250,33 @@ window.ScorecardApp = (function() {
          renderScoreCounters();
     }
 
-    function nextHole() {
+    function toggleTracker() {
+        if (!window.ShotTracker) return;
+        const btnText = document.getElementById('tracker-status-text');
+        
+        if (window.ShotTracker.isTracking()) {
+            window.ShotTracker.stopTracking();
+            btnText.innerText = "Ativar GPS Tracker (Ficará ativo no bolso)";
+            document.getElementById('btn-toggle-tracker').style.background = 'var(--bg-secondary)';
+            document.getElementById('btn-toggle-tracker').style.color = 'var(--accent-primary)';
+        } else {
+            window.ShotTracker.startTracking();
+            btnText.innerText = "Gravando Tacadas (GPS Ativo)";
+            document.getElementById('btn-toggle-tracker').style.background = 'rgba(16, 185, 129, 0.2)';
+            document.getElementById('btn-toggle-tracker').style.color = 'var(--accent-primary)';
+        }
+    }
+
+    async function nextHole() {
+          if (window.ShotTracker && window.ShotTracker.isTracking()) {
+              const data = window.ShotTracker.endHoleAndGetWalkthroughData();
+              openWalkthroughUI(data);
+          } else {
+              proceedToNextHole();
+          }
+     }
+
+     function proceedToNextHole() {
           if (activeMatchState.currentHole < (activeMatchState.totalHoles || activeMatchState.physicalHoles)) {
               activeMatchState.currentHole++;
               db.setActiveMatch(activeMatchState);
@@ -258,6 +284,117 @@ window.ScorecardApp = (function() {
           } else {
               confirmFinishMatch();
           }
+     }
+
+     // --- Shot Walkthrough State (V2.0) ---
+     let wtData = null;
+     let wtCurrentIndex = 0;
+     let wtTotalShotsToMap = 0;
+     let wtCurrentLie = 'tee';
+     let wtCurrentClub = 'Driver';
+     let wtCurrentShotsArray = [];
+
+     function openWalkthroughUI(data) {
+         wtData = data;
+         wtCurrentIndex = 0;
+         wtCurrentShotsArray = [];
+         
+         const holeIdx = activeMatchState.currentHole - 1;
+         const pId = activeMatchState.players[0].id;
+         const scoreObj = activeMatchState.scores[pId][0][holeIdx] || { g: 0, p: 0 };
+         wtTotalShotsToMap = scoreObj.g + scoreObj.p;
+
+         if (wtTotalShotsToMap === 0) {
+             // Se não marcou pontos, pula.
+             proceedToNextHole();
+             return;
+         }
+
+         document.getElementById('wt-hole-num').innerText = activeMatchState.currentHole;
+
+         if (!data.predictedShots || data.predictedShots.length === 0) {
+             data.predictedShots = [{ lat: window.GolfMap?.getHoleData()?.greenCenter?.lat || 0, lng: window.GolfMap?.getHoleData()?.greenCenter?.lng || 0 }];
+         }
+
+         document.getElementById('shot-walkthrough-overlay').classList.add('active');
+         
+         if (window.GolfMap && window.GolfMap.initWalkthroughMap) {
+             window.GolfMap.initWalkthroughMap('wt-map-container', data);
+         }
+         
+         renderWalkthroughStep();
+     }
+
+     function renderWalkthroughStep() {
+         if (wtCurrentIndex >= wtTotalShotsToMap) {
+             closeWalkthroughUI();
+             return;
+         }
+
+         const isFirst = wtCurrentIndex === 0;
+         const isLastTwo = wtCurrentIndex >= wtTotalShotsToMap - 2;
+         document.getElementById('wt-current-shot-title').innerText = `Tacada ${wtCurrentIndex + 1} de ${wtTotalShotsToMap} ${isFirst ? '(Tee)' : ''}`;
+         
+         selectWalkthroughLie(isFirst ? 'tee' : (isLastTwo && wtCurrentIndex >= wtTotalShotsToMap - activeMatchState.scores[activeMatchState.players[0].id][0][activeMatchState.currentHole - 1].p ? 'green' : 'fairway'));
+         selectWalkthroughClub(isFirst ? 'Driver' : (wtCurrentLie === 'green' ? 'Putter' : '7i'));
+         
+         // Tentar focar no GPS marker correspondente (ou no último se acabaram os do GPS)
+         const gpsIndex = Math.min(wtCurrentIndex, wtData.predictedShots.length - 1);
+         if (window.GolfMap && window.GolfMap.focusWalkthroughShot) {
+             window.GolfMap.focusWalkthroughShot(gpsIndex);
+         }
+     }
+
+     function selectWalkthroughLie(lie) {
+         wtCurrentLie = lie;
+         document.querySelectorAll('#wt-lie-selector .lie-btn').forEach(btn => btn.classList.remove('active'));
+         const activeBtn = document.querySelector(`#wt-lie-selector .lie-btn[data-lie="${lie}"]`);
+         if (activeBtn) activeBtn.classList.add('active');
+     }
+
+     function selectWalkthroughClub(club) {
+         wtCurrentClub = club;
+         document.querySelectorAll('#wt-club-selector .lie-btn').forEach(btn => btn.classList.remove('active'));
+         const activeBtn = document.querySelector(`#wt-club-selector .lie-btn[data-club="${club}"]`);
+         if (activeBtn) activeBtn.classList.add('active');
+     }
+
+     function deferWalkthrough() {
+         // Pular buraco e salvar dados brutos para depois
+         if (!activeMatchState.pendingWalkthroughs) activeMatchState.pendingWalkthroughs = {};
+         activeMatchState.pendingWalkthroughs[activeMatchState.currentHole] = wtData;
+         
+         document.getElementById('shot-walkthrough-overlay').classList.remove('active');
+         db.setActiveMatch(activeMatchState);
+         proceedToNextHole();
+     }
+
+     function confirmWalkthroughShot() {
+         const gpsIndex = Math.min(wtCurrentIndex, wtData.predictedShots.length - 1);
+         let shot = { ...wtData.predictedShots[gpsIndex] };
+         
+         shot.lie = wtCurrentLie;
+         shot.club = wtCurrentClub;
+         shot.strokeNumber = wtCurrentIndex + 1;
+         
+         if (window.GolfMap && window.GolfMap.getWalkthroughShotLocation) {
+             const loc = window.GolfMap.getWalkthroughShotLocation(gpsIndex);
+             shot.lat = loc.lat;
+             shot.lng = loc.lng;
+         }
+
+         wtCurrentShotsArray.push(shot);
+         wtCurrentIndex++;
+         renderWalkthroughStep();
+     }
+
+     async function closeWalkthroughUI() {
+         if (!activeMatchState.validatedShots) activeMatchState.validatedShots = {};
+         activeMatchState.validatedShots[activeMatchState.currentHole] = wtCurrentShotsArray;
+
+         document.getElementById('shot-walkthrough-overlay').classList.remove('active');
+         await db.setActiveMatch(activeMatchState);
+         proceedToNextHole();
      }
 
      function prevHole() {
@@ -271,7 +408,6 @@ window.ScorecardApp = (function() {
           let incomplete = false;
            Object.keys(activeMatchState.scores).forEach(pId => {
                 activeMatchState.scores[pId].forEach(bArr => {
-                     // Incomplete if total strokes (g+p) is 0 for any hole
                      if (bArr.some(s => (s.g + s.p) === 0)) incomplete = true;
                 });
            });
@@ -281,7 +417,12 @@ window.ScorecardApp = (function() {
                return;
           }
 
-          if(confirm("Deseja FINALIZAR e salvar no histórico oficial?")) {
+          let pendingWarning = '';
+          if (activeMatchState.pendingWalkthroughs && Object.keys(activeMatchState.pendingWalkthroughs).length > 0) {
+              pendingWarning = `Você tem ${Object.keys(activeMatchState.pendingWalkthroughs).length} buraco(s) com mapeamento de tacadas pendente. `;
+          }
+
+          if(confirm(pendingWarning + "Deseja FINALIZAR e salvar no histórico oficial?")) {
               finishMatch();
           }
      }
@@ -303,10 +444,17 @@ window.ScorecardApp = (function() {
      }
 
     // Attempt to resume
-    async function resumeActive() {
-         const active = await db.getActiveMatch();
+    async function resumeActive(id) {
+         let active;
+         if (id) {
+             active = await db.getActiveMatch(id);
+         } else {
+             // Fallback for single match view or legacy calls
+             const allMatches = await db.getAllActiveMatches();
+             if (allMatches.length > 0) active = allMatches[0];
+         }
+         
          if (active) {
-             // Migration logic for old data format
              Object.keys(active.scores).forEach(pId => {
                  active.scores[pId].forEach(ballArray => {
                      ballArray.forEach((s, idx) => {
@@ -330,11 +478,16 @@ window.ScorecardApp = (function() {
          startMatch,
          updateScore,
          toggleGpsMap,
+         toggleTracker,
          nextHole,
          prevHole,
          finishMatch,
          confirmFinishMatch,
          saveAndExit,
-         resumeActive
+         resumeActive,
+         selectWalkthroughLie,
+         selectWalkthroughClub,
+         confirmWalkthroughShot,
+         deferWalkthrough
     };
 })();

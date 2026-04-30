@@ -80,15 +80,21 @@ window.db = (function() {
             return await matchStore.getItem(id);
         },
 
-        // Active Match State
-        async getActiveMatch() {
-            return await activeMatchStore.getItem('current');
+        // Active Match State (Multiple Matches)
+        async getActiveMatch(id) {
+            return await activeMatchStore.getItem(id);
+        },
+        async getAllActiveMatches() {
+            const matches = [];
+            await activeMatchStore.iterate((value) => { matches.push(value); });
+            return matches.sort((a,b) => b.date - a.date);
         },
         async setActiveMatch(match) {
-            await activeMatchStore.setItem('current', match);
+            if (!match.id) match.id = `match_${Date.now()}`;
+            await activeMatchStore.setItem(match.id, match);
         },
-        async clearActiveMatch() {
-            await activeMatchStore.removeItem('current');
+        async clearActiveMatch(id) {
+            await activeMatchStore.removeItem(id);
         },
         
         // Supabase Background Pull

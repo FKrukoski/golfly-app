@@ -31,15 +31,7 @@ const app = (function() {
              }
          }
         
-        // Check for active match to show the context card on Home
-        const active = await db.getActiveMatch();
-        if (active) {
-            document.getElementById('active-match-card').style.display = 'block';
-            document.getElementById('active-match-course').innerText = active.courseName;
-            document.getElementById('active-match-hole').innerText = active.currentHole;
-        } else {
-            document.getElementById('active-match-card').style.display = 'none';
-        }
+        await renderActiveMatches();
 
         // Role-based UI visibility
         const isAdmin = window.AuthApp.isAdmin();
@@ -114,6 +106,31 @@ const app = (function() {
              setTimeout(() => HistoryApp.initHistoryView(), 0);
         } else if (viewId === 'view-admin-panel') {
              renderAdminPanel();
+        }
+    }
+
+    async function renderActiveMatches() {
+        const container = document.getElementById('active-matches-container');
+        if (!container) return;
+        
+        const activeMatches = await db.getAllActiveMatches();
+        
+        if (activeMatches.length > 0) {
+            container.innerHTML = activeMatches.map(m => `
+                <div class="primary-card" style="background:linear-gradient(135deg, var(--bg-secondary), var(--accent-glow)); border-color:var(--accent-primary);" onclick="ScorecardApp.resumeActive('${m.id}')">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <div style="text-align:left;">
+                            <h3 style="font-size:1.2rem; margin-bottom:4px;">${m.courseName || 'Partida Ativa'}</h3>
+                            <p style="color:var(--text-primary); font-size:0.9rem;">Buraco ${m.currentHole || 1} • Em Progresso</p>
+                        </div>
+                        <button class="icon-btn" style="background:var(--accent-primary); border-radius:12px; padding:8px 16px; color:white; font-weight:700; width:auto; height:auto; font-size:0.8rem;">RETOMAR</button>
+                    </div>
+                </div>
+            `).join('');
+            container.style.display = 'flex';
+        } else {
+            container.style.display = 'none';
+            container.innerHTML = '';
         }
     }
 
@@ -510,7 +527,7 @@ const app = (function() {
     return {
         init, navigate, startCourseMapping, resumeCourseMapping, deleteCourseUi, switchMapperHole, saveMappingProgress,
         cancelMapping, applyManualCoords, handleCsvUpload, setManualPar, processAuth, toggleSidebar, downloadOfflineMap,
-        installPwa, submitRequest, handleApproval
+        installPwa, submitRequest, handleApproval, renderActiveMatches
     };
 })();
 

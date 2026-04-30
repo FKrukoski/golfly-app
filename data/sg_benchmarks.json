@@ -1,0 +1,78 @@
+{
+  "benchmark_data": {
+    "handicap_10": {
+      "tee": [
+        {"dist_yards": 100, "avg_strokes_to_hole": 2.70},
+        {"dist_yards": 150, "avg_strokes_to_hole": 2.95},
+        {"dist_yards": 200, "avg_strokes_to_hole": 3.20},
+        {"dist_yards": 300, "avg_strokes_to_hole": 3.75},
+        {"dist_yards": 400, "avg_strokes_to_hole": 4.15},
+        {"dist_yards": 500, "avg_strokes_to_hole": 4.55}
+      ],
+      "fairway": [
+        {"dist_yards": 100, "avg_strokes_to_hole": 2.85},
+        {"dist_yards": 150, "avg_strokes_to_hole": 3.12},
+        {"dist_yards": 200, "avg_strokes_to_hole": 3.45},
+        {"dist_yards": 250, "avg_strokes_to_hole": 3.80}
+      ],
+      "rough": [
+        {"dist_yards": 100, "avg_strokes_to_hole": 3.02},
+        {"dist_yards": 150, "avg_strokes_to_hole": 3.35},
+        {"dist_yards": 200, "avg_strokes_to_hole": 3.80}
+      ],
+      "sand": [
+        {"dist_yards": 20, "avg_strokes_to_hole": 2.80},
+        {"dist_yards": 100, "avg_strokes_to_hole": 3.20},
+        {"dist_yards": 150, "avg_strokes_to_hole": 3.50}
+      ],
+      "recovery": [
+        {"dist_yards": 100, "avg_strokes_to_hole": 3.60},
+        {"dist_yards": 150, "avg_strokes_to_hole": 3.90}
+      ],
+      "green": [
+        {"dist_yards": 1, "avg_strokes_to_hole": 1.05},
+        {"dist_yards": 5, "avg_strokes_to_hole": 1.45},
+        {"dist_yards": 10, "avg_strokes_to_hole": 1.80},
+        {"dist_yards": 20, "avg_strokes_to_hole": 2.15},
+        {"dist_yards": 30, "avg_strokes_to_hole": 2.45}
+      ]
+    },
+    "scratch": {
+      "tee": [
+        {"dist_yards": 100, "avg_strokes_to_hole": 2.60},
+        {"dist_yards": 150, "avg_strokes_to_hole": 2.85},
+        {"dist_yards": 200, "avg_strokes_to_hole": 3.00},
+        {"dist_yards": 300, "avg_strokes_to_hole": 3.55},
+        {"dist_yards": 400, "avg_strokes_to_hole": 3.99},
+        {"dist_yards": 500, "avg_strokes_to_hole": 4.40}
+      ],
+      "fairway": [
+        {"dist_yards": 100, "avg_strokes_to_hole": 2.70},
+        {"dist_yards": 150, "avg_strokes_to_hole": 2.98},
+        {"dist_yards": 200, "avg_strokes_to_hole": 3.25},
+        {"dist_yards": 250, "avg_strokes_to_hole": 3.55}
+      ],
+      "rough": [
+        {"dist_yards": 100, "avg_strokes_to_hole": 2.85},
+        {"dist_yards": 150, "avg_strokes_to_hole": 3.15},
+        {"dist_yards": 200, "avg_strokes_to_hole": 3.45}
+      ],
+      "sand": [
+        {"dist_yards": 20, "avg_strokes_to_hole": 2.40},
+        {"dist_yards": 100, "avg_strokes_to_hole": 3.00},
+        {"dist_yards": 150, "avg_strokes_to_hole": 3.30}
+      ],
+      "recovery": [
+        {"dist_yards": 100, "avg_strokes_to_hole": 3.40},
+        {"dist_yards": 150, "avg_strokes_to_hole": 3.70}
+      ],
+      "green": [
+        {"dist_yards": 1, "avg_strokes_to_hole": 1.01},
+        {"dist_yards": 5, "avg_strokes_to_hole": 1.25},
+        {"dist_yards": 10, "avg_strokes_to_hole": 1.65},
+        {"dist_yards": 20, "avg_strokes_to_hole": 1.95},
+        {"dist_yards": 30, "avg_strokes_to_hole": 2.15}
+      ]
+    }
+  }
+}

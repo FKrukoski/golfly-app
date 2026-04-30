@@ -97,16 +97,8 @@
                 </div>
 
                 <!-- Active Match Card (Contextual) -->
-                <div id="active-match-card" style="display:none; margin-bottom:24px;">
-                    <div class="primary-card" style="background:linear-gradient(135deg, var(--bg-secondary), var(--accent-glow)); border-color:var(--accent-primary);" onclick="ScorecardApp.resumeActive()">
-                        <div style="display:flex; justify-content:space-between; align-items:center;">
-                            <div style="text-align:left;">
-                                <h3 id="active-match-course" style="font-size:1.2rem; margin-bottom:4px;">Campo Ativo</h3>
-                                <p style="color:var(--text-primary); font-size:0.9rem;">Buraco <span id="active-match-hole">1</span> • Em Progresso</p>
-                            </div>
-                            <button class="icon-btn" style="background:var(--accent-primary); border-radius:12px; padding:8px 16px; color:white; font-weight:700; width:auto; height:auto; font-size:0.8rem;">RETOMAR</button>
-                        </div>
-                    </div>
+                <div id="active-matches-container" style="margin-bottom:24px; display:flex; flex-direction:column; gap:12px;">
+                    <!-- Active matches injected here -->
                 </div>
 
                 <div class="action-grid">
@@ -286,6 +278,12 @@
                     <!-- Players Score UI will be injected here -->
                 </div>
 
+                <div style="margin-bottom:16px;">
+                    <button id="btn-toggle-tracker" class="secondary-card" style="width:100%; text-align:center; padding:12px; border-color:var(--accent-primary); color:var(--accent-primary); display:flex; justify-content:center; align-items:center; gap:8px;" onclick="ScorecardApp.toggleTracker()">
+                        <span>📍</span> <span id="tracker-status-text">Ativar GPS Tracker (Ficará ativo no bolso)</span>
+                    </button>
+                </div>
+
                 <div style="display:flex;justify-content:space-between;gap:12px;margin-bottom:12px;">
                      <button class="secondary-card" style="flex:1;text-align:center;padding:14px;background:var(--bg-secondary);" onclick="ScorecardApp.prevHole()">
                          ⬅ Anterior
@@ -385,10 +383,58 @@
 
         </main>
         
-        <!-- Bottom Tab Bar removida por solicitação: navegação agora é via menu lateral -->
+        <!-- Walkthrough Overlay (V2.0) -->
+        <div id="shot-walkthrough-overlay" class="walkthrough-overlay">
+            <div class="walkthrough-header">
+                <h2 style="font-size:1.5rem; margin-bottom:4px;">Revisão do Buraco <span id="wt-hole-num"></span></h2>
+                <p style="color:var(--text-secondary); font-size:0.9rem;">Valide as tacadas detectadas (Arraste para ajustar)</p>
+            </div>
+            
+            <div id="wt-map-container" class="walkthrough-map-container">
+                <div id="wt-hud-distance" class="walkthrough-hud" style="display:none;">Ao Green: -- yds</div>
+            </div>
+            
+            <div class="walkthrough-form">
+                <h3 id="wt-current-shot-title" style="margin-bottom:16px;">Tacada 1 (Tee)</h3>
+                
+                <label style="font-size:0.8rem; color:var(--text-secondary); margin-bottom:8px; display:block;">Terreno / Lie</label>
+                <div class="lie-selector" id="wt-lie-selector" style="margin-bottom:16px;">
+                    <button class="lie-btn active" data-lie="tee" onclick="ScorecardApp.selectWalkthroughLie('tee')">Tee Box</button>
+                    <button class="lie-btn" data-lie="fairway" onclick="ScorecardApp.selectWalkthroughLie('fairway')">Fairway</button>
+                    <button class="lie-btn" data-lie="rough" onclick="ScorecardApp.selectWalkthroughLie('rough')">Rough</button>
+                    <button class="lie-btn" data-lie="sand" onclick="ScorecardApp.selectWalkthroughLie('sand')">Areia</button>
+                    <button class="lie-btn" data-lie="recovery" onclick="ScorecardApp.selectWalkthroughLie('recovery')">Recovery</button>
+                    <button class="lie-btn" data-lie="green" onclick="ScorecardApp.selectWalkthroughLie('green')">Green</button>
+                </div>
+
+                <label style="font-size:0.8rem; color:var(--text-secondary); margin-bottom:8px; display:block;">Taco (Club)</label>
+                <div class="lie-selector" id="wt-club-selector">
+                    <button class="lie-btn active" data-club="Driver" onclick="ScorecardApp.selectWalkthroughClub('Driver')">Driver</button>
+                    <button class="lie-btn" data-club="3W" onclick="ScorecardApp.selectWalkthroughClub('3W')">3W</button>
+                    <button class="lie-btn" data-club="5W" onclick="ScorecardApp.selectWalkthroughClub('5W')">5W</button>
+                    <button class="lie-btn" data-club="4i" onclick="ScorecardApp.selectWalkthroughClub('4i')">4i</button>
+                    <button class="lie-btn" data-club="5i" onclick="ScorecardApp.selectWalkthroughClub('5i')">5i</button>
+                    <button class="lie-btn" data-club="6i" onclick="ScorecardApp.selectWalkthroughClub('6i')">6i</button>
+                    <button class="lie-btn" data-club="7i" onclick="ScorecardApp.selectWalkthroughClub('7i')">7i</button>
+                    <button class="lie-btn" data-club="8i" onclick="ScorecardApp.selectWalkthroughClub('8i')">8i</button>
+                    <button class="lie-btn" data-club="9i" onclick="ScorecardApp.selectWalkthroughClub('9i')">9i</button>
+                    <button class="lie-btn" data-club="PW" onclick="ScorecardApp.selectWalkthroughClub('PW')">PW</button>
+                    <button class="lie-btn" data-club="AW" onclick="ScorecardApp.selectWalkthroughClub('AW')">AW</button>
+                    <button class="lie-btn" data-club="SW" onclick="ScorecardApp.selectWalkthroughClub('SW')">SW</button>
+                    <button class="lie-btn" data-club="Putter" onclick="ScorecardApp.selectWalkthroughClub('Putter')">Putter</button>
+                </div>
+                
+                <div style="display:flex; gap:12px; margin-top:24px;">
+                    <button class="secondary-card" style="flex:1; padding:12px; text-align:center; font-size:0.9rem;" onclick="ScorecardApp.deferWalkthrough()">Pular Buraco</button>
+                    <button class="primary-card" style="flex:1; padding:12px; text-align:center; font-size:0.9rem;" onclick="ScorecardApp.confirmWalkthroughShot()">✅ Confirmar</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Application Logic -->
+    <script src="js/tracker.js?v=2.0"></script>
+    <script src="js/sg_engine.js?v=2.0"></script>
     <script src="js/auth.js?v=1.5"></script>
     <script src="js/storage.js?v=1.5"></script>
     <script src="js/map.js?v=1.5"></script>
