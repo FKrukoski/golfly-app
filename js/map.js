@@ -404,89 +404,109 @@ window.GolfMap = (function() {
     let wtMarkers = [];
     let wtPolyline = null;
 
-    function initWalkthroughMap(containerId, data) {
+    function initWalkthroughMap(containerId, activeShots) {
         if (wtMapInstance) {
             wtMapInstance.remove();
             wtMapInstance = null;
         }
         
-        let center = data.predictedShots && data.predictedShots.length > 0 ? 
-            [data.predictedShots[0].lat, data.predictedShots[0].lng] : [-23.5505, -46.6333];
+        let center = activeShots && activeShots.length > 0 ? 
+            [activeShots[0].lat, activeShots[0].lng] : (scorecardGreenCenter || [-23.5505, -46.6333]);
             
         wtMapInstance = L.map(containerId, { rotate: true, bearing: 0 }).setView(center, 18);
         L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
             maxZoom: 20
         }).addTo(wtMapInstance);
         
-        if (data.path && data.path.length > 0) {
-            const pts = data.path.map(p => [p.lat, p.lng]);
-            wtPolyline = L.polyline(pts, { color: '#3B82F6', weight: 3, dashArray: '5,5', opacity: 0.6 }).addTo(wtMapInstance);
-        }
-        
-        wtMarkers = [];
-        if (data.predictedShots) {
-            data.predictedShots.forEach((shot, i) => {
-                const icon = L.divIcon({
-                    className: "wt-shot-pin",
-                    html: `<div style="background:var(--accent-primary);width:20px;height:20px;border-radius:50%;border:2px solid #fff;display:flex;align-items:center;justify-content:center;color:white;font-size:10px;font-weight:bold;box-shadow:0 0 8px rgba(0,0,0,0.5);">${i+1}</div>`,
-                    iconAnchor: [10, 10]
-                });
-                const m = L.marker([shot.lat, shot.lng], { icon, draggable: true }).addTo(wtMapInstance);
-                
-                let touchTimer;
-                m.on('mousedown touchstart', () => {
-                    touchTimer = setTimeout(() => {
-                        if (navigator.vibrate) navigator.vibrate(50);
-                        if (m.getElement()) m.getElement().classList.add('shot-pin-dragging');
-                    }, 300);
-                });
-                m.on('mouseup touchend', () => {
-                    clearTimeout(touchTimer);
-                    if (m.getElement()) m.getElement().classList.remove('shot-pin-dragging');
-                });
-                m.on('drag', () => {
-                    updateWtDistanceHUD(m.getLatLng());
-                });
-                m.on('dragend', () => {
-                    const hud = document.getElementById('wt-hud-distance');
-                    if (hud) hud.style.display = 'none';
-                    if (m.getElement()) m.getElement().classList.remove('shot-pin-dragging');
-                });
-                
-                wtMarkers.push(m);
-            });
-        }
-
         if (scorecardGreenCenter) {
             L.marker(scorecardGreenCenter, {
                 icon: L.divIcon({ html: `🎯`, iconSize: [24,24], iconAnchor: [12,12] })
             }).addTo(wtMapInstance);
         }
+
+        refreshWalkthroughMarkers(activeShots);
     }
 
-    function focusWalkthroughShot(index) {
-        if (wtMarkers[index]) {
-            wtMapInstance.setView(wtMarkers[index].getLatLng(), 19);
-            wtMarkers.forEach((m, i) => {
-                if (m.getElement()) {
-                    if (i === index) {
-                        m.getElement().style.transform += ' scale(1.2)';
-                        m.getElement().style.zIndex = 1000;
-                    } else {
-                        m.getElement().style.transform = m.getElement().style.transform.replace(' scale(1.2)', '');
-                        m.getElement().style.zIndex = 400;
-                    }
+    function refreshWalkthroughMarkers(activeShots) {
+        // Clear existing
+        wtMarkers.forEach(m => wtMapInstance.removeLayer(m));
+        wtMarkers = [];
+        if (wtPolyline) {
+            wtMapInstance.removeLayer(wtPolyline);
+            wtPolyline = null;
+        }
+
+        if (!activeShots || activeShots.length === 0) return;
+
+        // Draw polyline
+        const pts = activeShots.map(p => [p.lat, p.lng]);
+        if (scorecardGreenCenter) pts.push(scorecardGreenCenter);
+        wtPolyline = L.polyline(pts, { color: '#3B82F6', weight: 3, dashArray: '5,5', opacity: 0.8 }).addTo(wtMapInstance);
+
+        // Draw markers
+        activeShots.forEach((shot, i) => {
+            const icon = L.divIcon({
+                className: "wt-shot-pin",
+                html: `<div style="background:var(--accent-primary);width:24px;height:24px;border-radius:50%;border:2px solid #fff;display:flex;align-items:center;justify-content:center;color:white;font-size:12px;font-weight:bold;box-shadow:0 0 8px rgba(0,0,0,0.5);">${i+1}</div>`,
+                iconAnchor: [12, 12]
+            });
+            
+            const m = L.marker([shot.lat, shot.lng], { icon, draggable: true }).addTo(wtMapInstance);
+            
+            m.on('click', () => {
+                if (window.ScorecardApp && window.ScorecardApp.onWalkthroughMarkerSelected) {
+                    window.ScorecardApp.onWalkthroughMarkerSelected(i);
+                }
+                selectWalkthroughMarker(i);
+            });
+
+            m.on('drag', () => {
+                updateWtDistanceHUD(m.getLatLng());
+                // Update polyline dynamically
+                if (wtPolyline) {
+                    const currentPts = wtMarkers.map(marker => marker.getLatLng());
+                    if (scorecardGreenCenter) currentPts.push(scorecardGreenCenter);
+                    wtPolyline.setLatLngs(currentPts);
                 }
             });
+            m.on('dragend', () => {
+                const hud = document.getElementById('wt-hud-distance');
+                if (hud) hud.style.display = 'none';
+            });
+            
+            wtMarkers.push(m);
+        });
+        
+        // Auto-fit bounds if we have more than 1 point
+        if (pts.length > 1) {
+             wtMapInstance.fitBounds(wtPolyline.getBounds(), { padding: [30, 30] });
         }
     }
 
-    function getWalkthroughShotLocation(index) {
-        if (wtMarkers[index]) {
-            const pos = wtMarkers[index].getLatLng();
+    function selectWalkthroughMarker(index) {
+        wtMarkers.forEach((m, i) => {
+            if (m.getElement()) {
+                const circle = m.getElement().querySelector('div');
+                if (!circle) return;
+                
+                if (i === index) {
+                    circle.style.background = 'var(--warning)'; // highlight selected
+                    circle.style.transform = 'scale(1.3)';
+                    m.getElement().style.zIndex = 1000;
+                } else {
+                    circle.style.background = 'var(--accent-primary)';
+                    circle.style.transform = 'scale(1)';
+                    m.getElement().style.zIndex = 400;
+                }
+            }
+        });
+    }
+
+    function getWalkthroughShotsArray() {
+        return wtMarkers.map(m => {
+            const pos = m.getLatLng();
             return { lat: pos.lat, lng: pos.lng };
-        }
-        return { lat: 0, lng: 0 };
+        });
     }
 
     function updateWtDistanceHUD(latlng) {
@@ -497,6 +517,7 @@ window.GolfMap = (function() {
             hud.style.display = 'block';
         }
     }
+
     return {
         initMap,
         setActivePointType,
@@ -514,7 +535,8 @@ window.GolfMap = (function() {
         setOfflineOverlay,
         toggleSelection,
         initWalkthroughMap,
-        focusWalkthroughShot,
-        getWalkthroughShotLocation
+        refreshWalkthroughMarkers,
+        selectWalkthroughMarker,
+        getWalkthroughShotsArray
     };
 })();

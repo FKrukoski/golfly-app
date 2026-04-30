@@ -286,112 +286,193 @@ window.ScorecardApp = (function() {
           }
      }
 
-     // --- Shot Walkthrough State (V2.0) ---
+     // --- Shot Walkthrough State (V3.0 All-In-One) ---
      let wtData = null;
-     let wtCurrentIndex = 0;
-     let wtTotalShotsToMap = 0;
-     let wtCurrentLie = 'tee';
-     let wtCurrentClub = 'Driver';
-     let wtCurrentShotsArray = [];
+     let wtTotalScore = 0;
+     let wtActiveShots = []; // { id, lat, lng, lie, club }
+     let wtSelectedShotIndex = -1;
 
      function openWalkthroughUI(data) {
          wtData = data;
-         wtCurrentIndex = 0;
-         wtCurrentShotsArray = [];
          
          const holeIdx = activeMatchState.currentHole - 1;
          const pId = activeMatchState.players[0].id;
          const scoreObj = activeMatchState.scores[pId][0][holeIdx] || { g: 0, p: 0 };
-         wtTotalShotsToMap = scoreObj.g + scoreObj.p;
+         wtTotalScore = scoreObj.g + scoreObj.p;
 
-         if (wtTotalShotsToMap === 0) {
-             // Se não marcou pontos, pula.
+         if (wtTotalScore === 0) {
              proceedToNextHole();
              return;
          }
 
          document.getElementById('wt-hole-num').innerText = activeMatchState.currentHole;
 
-         if (!data.predictedShots || data.predictedShots.length === 0) {
-             data.predictedShots = [{ lat: window.GolfMap?.getHoleData()?.greenCenter?.lat || 0, lng: window.GolfMap?.getHoleData()?.greenCenter?.lng || 0 }];
+         // Initialize wtActiveShots based on score and GPS
+         wtActiveShots = [];
+         let gpsShots = data.predictedShots || [];
+         
+         for (let i = 0; i < wtTotalScore; i++) {
+             let gpsSource = gpsShots[i];
+             if (!gpsSource && i > 0) gpsSource = wtActiveShots[i-1]; // Fallback to previous
+             if (!gpsSource) gpsSource = { lat: window.GolfMap?.getHoleData()?.greenCenter?.lat || 0, lng: window.GolfMap?.getHoleData()?.greenCenter?.lng || 0 };
+             
+             let lie = i === 0 ? 'tee' : (i >= wtTotalScore - scoreObj.p ? 'green' : 'fairway');
+             let club = i === 0 ? 'Driver' : (lie === 'green' ? 'Putter' : '7i');
+             
+             wtActiveShots.push({
+                 id: 'shot_' + Date.now() + '_' + i,
+                 lat: gpsSource.lat,
+                 lng: gpsSource.lng,
+                 lie: lie,
+                 club: club
+             });
          }
 
+         wtSelectedShotIndex = -1;
          document.getElementById('shot-walkthrough-overlay').classList.add('active');
          
          if (window.GolfMap && window.GolfMap.initWalkthroughMap) {
-             window.GolfMap.initWalkthroughMap('wt-map-container', data);
+             window.GolfMap.initWalkthroughMap('wt-map-container', wtActiveShots);
          }
          
-         renderWalkthroughStep();
+         updateWalkthroughUI();
      }
 
-     function renderWalkthroughStep() {
-         if (wtCurrentIndex >= wtTotalShotsToMap) {
-             closeWalkthroughUI();
-             return;
+     function updateWalkthroughUI() {
+         document.getElementById('wt-mapped-count').innerText = wtActiveShots.length;
+         document.getElementById('wt-total-count').innerText = wtTotalScore;
+         
+         if (wtActiveShots.length !== wtTotalScore) {
+             document.getElementById('wt-current-shot-title').style.color = 'var(--danger)';
+         } else {
+             document.getElementById('wt-current-shot-title').style.color = 'inherit';
          }
 
-         const isFirst = wtCurrentIndex === 0;
-         const isLastTwo = wtCurrentIndex >= wtTotalShotsToMap - 2;
-         document.getElementById('wt-current-shot-title').innerText = `Tacada ${wtCurrentIndex + 1} de ${wtTotalShotsToMap} ${isFirst ? '(Tee)' : ''}`;
-         
-         selectWalkthroughLie(isFirst ? 'tee' : (isLastTwo && wtCurrentIndex >= wtTotalShotsToMap - activeMatchState.scores[activeMatchState.players[0].id][0][activeMatchState.currentHole - 1].p ? 'green' : 'fairway'));
-         selectWalkthroughClub(isFirst ? 'Driver' : (wtCurrentLie === 'green' ? 'Putter' : '7i'));
-         
-         // Tentar focar no GPS marker correspondente (ou no último se acabaram os do GPS)
-         const gpsIndex = Math.min(wtCurrentIndex, wtData.predictedShots.length - 1);
-         if (window.GolfMap && window.GolfMap.focusWalkthroughShot) {
-             window.GolfMap.focusWalkthroughShot(gpsIndex);
+         const showDetails = document.getElementById('wt-detail-toggle').checked;
+         const detailsPanel = document.getElementById('wt-details-panel');
+         const propertiesEditor = document.getElementById('wt-properties-editor');
+         const selectionHint = document.getElementById('wt-selection-hint');
+
+         if (!showDetails) {
+             detailsPanel.style.display = 'none';
+         } else {
+             detailsPanel.style.display = 'block';
+             if (wtSelectedShotIndex >= 0 && wtSelectedShotIndex < wtActiveShots.length) {
+                 selectionHint.style.display = 'none';
+                 propertiesEditor.style.display = 'block';
+                 
+                 document.getElementById('wt-editing-idx').innerText = wtSelectedShotIndex + 1;
+                 const shot = wtActiveShots[wtSelectedShotIndex];
+                 
+                 // update UI buttons
+                 document.querySelectorAll('#wt-lie-selector .lie-btn').forEach(btn => btn.classList.remove('active'));
+                 const lieBtn = document.querySelector(`#wt-lie-selector .lie-btn[data-lie="${shot.lie}"]`);
+                 if (lieBtn) lieBtn.classList.add('active');
+
+                 document.querySelectorAll('#wt-club-selector .lie-btn').forEach(btn => btn.classList.remove('active'));
+                 const clubBtn = document.querySelector(`#wt-club-selector .lie-btn[data-club="${shot.club}"]`);
+                 if (clubBtn) clubBtn.classList.add('active');
+                 
+             } else {
+                 selectionHint.style.display = 'block';
+                 propertiesEditor.style.display = 'none';
+             }
          }
+     }
+
+     function toggleWalkthroughDetails() {
+         updateWalkthroughUI();
+     }
+
+     function onWalkthroughMarkerSelected(index) {
+         wtSelectedShotIndex = index;
+         document.getElementById('wt-detail-toggle').checked = true;
+         updateWalkthroughUI();
      }
 
      function selectWalkthroughLie(lie) {
-         wtCurrentLie = lie;
-         document.querySelectorAll('#wt-lie-selector .lie-btn').forEach(btn => btn.classList.remove('active'));
-         const activeBtn = document.querySelector(`#wt-lie-selector .lie-btn[data-lie="${lie}"]`);
-         if (activeBtn) activeBtn.classList.add('active');
+         if (wtSelectedShotIndex >= 0 && wtSelectedShotIndex < wtActiveShots.length) {
+             wtActiveShots[wtSelectedShotIndex].lie = lie;
+             updateWalkthroughUI();
+         }
      }
 
      function selectWalkthroughClub(club) {
-         wtCurrentClub = club;
-         document.querySelectorAll('#wt-club-selector .lie-btn').forEach(btn => btn.classList.remove('active'));
-         const activeBtn = document.querySelector(`#wt-club-selector .lie-btn[data-club="${club}"]`);
-         if (activeBtn) activeBtn.classList.add('active');
+         if (wtSelectedShotIndex >= 0 && wtSelectedShotIndex < wtActiveShots.length) {
+             wtActiveShots[wtSelectedShotIndex].club = club;
+             updateWalkthroughUI();
+         }
+     }
+
+     function addWalkthroughShot() {
+         const lastShot = wtActiveShots.length > 0 ? wtActiveShots[wtActiveShots.length - 1] : { lat: window.GolfMap?.getHoleData()?.greenCenter?.lat || 0, lng: window.GolfMap?.getHoleData()?.greenCenter?.lng || 0 };
+         
+         const newShot = {
+             id: 'shot_' + Date.now(),
+             lat: lastShot.lat, 
+             lng: lastShot.lng,
+             lie: 'fairway',
+             club: '7i'
+         };
+         
+         wtActiveShots.push(newShot);
+         wtSelectedShotIndex = wtActiveShots.length - 1;
+         
+         if (window.GolfMap && window.GolfMap.refreshWalkthroughMarkers) {
+             window.GolfMap.refreshWalkthroughMarkers(wtActiveShots);
+             window.GolfMap.selectWalkthroughMarker(wtSelectedShotIndex);
+         }
+         
+         updateWalkthroughUI();
+     }
+
+     function removeWalkthroughShot() {
+         if (wtSelectedShotIndex >= 0 && wtSelectedShotIndex < wtActiveShots.length) {
+             wtActiveShots.splice(wtSelectedShotIndex, 1);
+             wtSelectedShotIndex = -1;
+             
+             if (window.GolfMap && window.GolfMap.refreshWalkthroughMarkers) {
+                 window.GolfMap.refreshWalkthroughMarkers(wtActiveShots);
+             }
+             
+             updateWalkthroughUI();
+         }
      }
 
      function deferWalkthrough() {
-         // Pular buraco e salvar dados brutos para depois
          if (!activeMatchState.pendingWalkthroughs) activeMatchState.pendingWalkthroughs = {};
          activeMatchState.pendingWalkthroughs[activeMatchState.currentHole] = wtData;
-         
          document.getElementById('shot-walkthrough-overlay').classList.remove('active');
          db.setActiveMatch(activeMatchState);
          proceedToNextHole();
      }
 
-     function confirmWalkthroughShot() {
-         const gpsIndex = Math.min(wtCurrentIndex, wtData.predictedShots.length - 1);
-         let shot = { ...wtData.predictedShots[gpsIndex] };
-         
-         shot.lie = wtCurrentLie;
-         shot.club = wtCurrentClub;
-         shot.strokeNumber = wtCurrentIndex + 1;
-         
-         if (window.GolfMap && window.GolfMap.getWalkthroughShotLocation) {
-             const loc = window.GolfMap.getWalkthroughShotLocation(gpsIndex);
-             shot.lat = loc.lat;
-             shot.lng = loc.lng;
+     async function saveWalkthroughHole() {
+         if (window.GolfMap && window.GolfMap.getWalkthroughShotsArray) {
+             const mapCoords = window.GolfMap.getWalkthroughShotsArray();
+             for (let i = 0; i < wtActiveShots.length; i++) {
+                 if (mapCoords[i]) {
+                     wtActiveShots[i].lat = mapCoords[i].lat;
+                     wtActiveShots[i].lng = mapCoords[i].lng;
+                 }
+             }
          }
 
-         wtCurrentShotsArray.push(shot);
-         wtCurrentIndex++;
-         renderWalkthroughStep();
-     }
+         if (wtActiveShots.length !== wtTotalScore) {
+             alert(`Aviso: O número de tacadas mapeadas (${wtActiveShots.length}) não bate com o score oficial do buraco (${wtTotalScore}). O mapa foi salvo com ${wtActiveShots.length} tacadas.`);
+         }
 
-     async function closeWalkthroughUI() {
          if (!activeMatchState.validatedShots) activeMatchState.validatedShots = {};
-         activeMatchState.validatedShots[activeMatchState.currentHole] = wtCurrentShotsArray;
+         
+         const finalShots = wtActiveShots.map((s, idx) => ({
+             lat: s.lat,
+             lng: s.lng,
+             lie: s.lie,
+             club: s.club,
+             strokeNumber: idx + 1
+         }));
 
+         activeMatchState.validatedShots[activeMatchState.currentHole] = finalShots;
          document.getElementById('shot-walkthrough-overlay').classList.remove('active');
          await db.setActiveMatch(activeMatchState);
          proceedToNextHole();
@@ -485,9 +566,13 @@ window.ScorecardApp = (function() {
          confirmFinishMatch,
          saveAndExit,
          resumeActive,
+         toggleWalkthroughDetails,
+         onWalkthroughMarkerSelected,
+         addWalkthroughShot,
+         removeWalkthroughShot,
          selectWalkthroughLie,
          selectWalkthroughClub,
-         confirmWalkthroughShot,
-         deferWalkthrough
+         deferWalkthrough,
+         saveWalkthroughHole
     };
 })();

@@ -394,39 +394,58 @@
                 <div id="wt-hud-distance" class="walkthrough-hud" style="display:none;">Ao Green: -- yds</div>
             </div>
             
-            <div class="walkthrough-form">
-                <h3 id="wt-current-shot-title" style="margin-bottom:16px;">Tacada 1 (Tee)</h3>
-                
-                <label style="font-size:0.8rem; color:var(--text-secondary); margin-bottom:8px; display:block;">Terreno / Lie</label>
-                <div class="lie-selector" id="wt-lie-selector" style="margin-bottom:16px;">
-                    <button class="lie-btn active" data-lie="tee" onclick="ScorecardApp.selectWalkthroughLie('tee')">Tee Box</button>
-                    <button class="lie-btn" data-lie="fairway" onclick="ScorecardApp.selectWalkthroughLie('fairway')">Fairway</button>
-                    <button class="lie-btn" data-lie="rough" onclick="ScorecardApp.selectWalkthroughLie('rough')">Rough</button>
-                    <button class="lie-btn" data-lie="sand" onclick="ScorecardApp.selectWalkthroughLie('sand')">Areia</button>
-                    <button class="lie-btn" data-lie="recovery" onclick="ScorecardApp.selectWalkthroughLie('recovery')">Recovery</button>
-                    <button class="lie-btn" data-lie="green" onclick="ScorecardApp.selectWalkthroughLie('green')">Green</button>
+            <div class="walkthrough-form" style="padding:16px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                    <h3 id="wt-current-shot-title" style="margin-bottom:0;">Mapeadas <span id="wt-mapped-count">0</span>/<span id="wt-total-count">0</span></h3>
+                    <label style="display:flex; align-items:center; gap:8px; font-size:0.8rem; color:var(--text-secondary);">
+                        <input type="checkbox" id="wt-detail-toggle" checked onchange="ScorecardApp.toggleWalkthroughDetails()" style="accent-color:var(--accent-primary);">
+                        Detalhar Tacos
+                    </label>
                 </div>
 
-                <label style="font-size:0.8rem; color:var(--text-secondary); margin-bottom:8px; display:block;">Taco (Club)</label>
-                <div class="lie-selector" id="wt-club-selector">
-                    <button class="lie-btn active" data-club="Driver" onclick="ScorecardApp.selectWalkthroughClub('Driver')">Driver</button>
-                    <button class="lie-btn" data-club="3W" onclick="ScorecardApp.selectWalkthroughClub('3W')">3W</button>
-                    <button class="lie-btn" data-club="5W" onclick="ScorecardApp.selectWalkthroughClub('5W')">5W</button>
-                    <button class="lie-btn" data-club="4i" onclick="ScorecardApp.selectWalkthroughClub('4i')">4i</button>
-                    <button class="lie-btn" data-club="5i" onclick="ScorecardApp.selectWalkthroughClub('5i')">5i</button>
-                    <button class="lie-btn" data-club="6i" onclick="ScorecardApp.selectWalkthroughClub('6i')">6i</button>
-                    <button class="lie-btn" data-club="7i" onclick="ScorecardApp.selectWalkthroughClub('7i')">7i</button>
-                    <button class="lie-btn" data-club="8i" onclick="ScorecardApp.selectWalkthroughClub('8i')">8i</button>
-                    <button class="lie-btn" data-club="9i" onclick="ScorecardApp.selectWalkthroughClub('9i')">9i</button>
-                    <button class="lie-btn" data-club="PW" onclick="ScorecardApp.selectWalkthroughClub('PW')">PW</button>
-                    <button class="lie-btn" data-club="AW" onclick="ScorecardApp.selectWalkthroughClub('AW')">AW</button>
-                    <button class="lie-btn" data-club="SW" onclick="ScorecardApp.selectWalkthroughClub('SW')">SW</button>
-                    <button class="lie-btn" data-club="Putter" onclick="ScorecardApp.selectWalkthroughClub('Putter')">Putter</button>
+                <div id="wt-details-panel" style="display:block; margin-bottom:12px; background:rgba(0,0,0,0.2); padding:12px; border-radius:12px;">
+                    <p id="wt-selection-hint" style="font-size:0.8rem; color:var(--text-secondary); text-align:center; margin:0;">Selecione um pino no mapa para editar o taco</p>
+                    
+                    <div id="wt-properties-editor" style="display:none;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                            <label style="font-size:0.8rem; color:var(--accent-primary); font-weight:bold;">Editando Tacada <span id="wt-editing-idx">1</span></label>
+                            <button class="icon-btn" style="color:var(--danger); font-size:1rem; padding:4px;" onclick="ScorecardApp.removeWalkthroughShot()">🗑️ Remover</button>
+                        </div>
+                        
+                        <div class="lie-selector" id="wt-lie-selector" style="margin-bottom:12px;">
+                            <button class="lie-btn" data-lie="tee" onclick="ScorecardApp.selectWalkthroughLie('tee')">Tee Box</button>
+                            <button class="lie-btn" data-lie="fairway" onclick="ScorecardApp.selectWalkthroughLie('fairway')">Fairway</button>
+                            <button class="lie-btn" data-lie="rough" onclick="ScorecardApp.selectWalkthroughLie('rough')">Rough</button>
+                            <button class="lie-btn" data-lie="sand" onclick="ScorecardApp.selectWalkthroughLie('sand')">Areia</button>
+                            <button class="lie-btn" data-lie="recovery" onclick="ScorecardApp.selectWalkthroughLie('recovery')">Recovery</button>
+                            <button class="lie-btn" data-lie="green" onclick="ScorecardApp.selectWalkthroughLie('green')">Green</button>
+                        </div>
+
+                        <div class="lie-selector" id="wt-club-selector">
+                            <button class="lie-btn" data-club="Driver" onclick="ScorecardApp.selectWalkthroughClub('Driver')">Driver</button>
+                            <button class="lie-btn" data-club="3W" onclick="ScorecardApp.selectWalkthroughClub('3W')">3W</button>
+                            <button class="lie-btn" data-club="5W" onclick="ScorecardApp.selectWalkthroughClub('5W')">5W</button>
+                            <button class="lie-btn" data-club="4i" onclick="ScorecardApp.selectWalkthroughClub('4i')">4i</button>
+                            <button class="lie-btn" data-club="5i" onclick="ScorecardApp.selectWalkthroughClub('5i')">5i</button>
+                            <button class="lie-btn" data-club="6i" onclick="ScorecardApp.selectWalkthroughClub('6i')">6i</button>
+                            <button class="lie-btn" data-club="7i" onclick="ScorecardApp.selectWalkthroughClub('7i')">7i</button>
+                            <button class="lie-btn" data-club="8i" onclick="ScorecardApp.selectWalkthroughClub('8i')">8i</button>
+                            <button class="lie-btn" data-club="9i" onclick="ScorecardApp.selectWalkthroughClub('9i')">9i</button>
+                            <button class="lie-btn" data-club="PW" onclick="ScorecardApp.selectWalkthroughClub('PW')">PW</button>
+                            <button class="lie-btn" data-club="AW" onclick="ScorecardApp.selectWalkthroughClub('AW')">AW</button>
+                            <button class="lie-btn" data-club="SW" onclick="ScorecardApp.selectWalkthroughClub('SW')">SW</button>
+                            <button class="lie-btn" data-club="Putter" onclick="ScorecardApp.selectWalkthroughClub('Putter')">Putter</button>
+                        </div>
+                    </div>
                 </div>
                 
-                <div style="display:flex; gap:12px; margin-top:24px;">
+                <div style="display:flex; justify-content:center; margin-bottom:16px;">
+                    <button class="secondary-card" style="padding:8px 16px; border-radius:20px; font-size:0.8rem;" onclick="ScorecardApp.addWalkthroughShot()">+ Adicionar Nova Tacada no Mapa</button>
+                </div>
+                
+                <div style="display:flex; gap:12px;">
                     <button class="secondary-card" style="flex:1; padding:12px; text-align:center; font-size:0.9rem;" onclick="ScorecardApp.deferWalkthrough()">Pular Buraco</button>
-                    <button class="primary-card" style="flex:1; padding:12px; text-align:center; font-size:0.9rem;" onclick="ScorecardApp.confirmWalkthroughShot()">✅ Confirmar</button>
+                    <button class="primary-card" style="flex:2; padding:12px; text-align:center; font-size:0.9rem;" onclick="ScorecardApp.saveWalkthroughHole()">✅ Salvar Buraco</button>
                 </div>
             </div>
         </div>
