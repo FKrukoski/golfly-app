@@ -88,8 +88,8 @@ window.GolfMap = (function() {
         let minLng = Math.min(...lngs);
         let maxLng = Math.max(...lngs);
         
-        // Add 500 yards margin (~0.004 degrees lat/lng)
-        const margin = 0.005; // ~500m
+        // Add margin (~600 yards / ~550 meters margin)
+        const margin = 0.0055; 
         return [
             [minLat - margin, minLng - margin],
             [maxLat + margin, maxLng + margin]

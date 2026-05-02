@@ -113,6 +113,7 @@ window.HistoryApp = (function() {
                 
                 <div style="display:flex; flex-wrap:wrap; gap:8px;">
                     <button class="primary-card" style="padding:10px 12px; font-size:0.8rem; border-radius:8px; flex:1.5; text-align:center; background:var(--accent-primary); color:white; border:none;" onclick="HistoryApp.viewMatchReport('${m.id}')">📊 Ver Scorecard</button>
+                    <button class="secondary-card" style="padding:10px 12px; font-size:0.8rem; border-radius:8px; flex:1; text-align:center;" onclick="HistoryApp.viewDetailedHoleHistory('${m.id}')">🔍 Detalhes</button>
                     <button class="secondary-card" style="padding:10px 12px; font-size:0.8rem; border-radius:8px; flex:1; text-align:center;" onclick="HistoryApp.editMatch('${m.id}')">✏️ Editar</button>
                     <button class="secondary-card" style="padding:10px 12px; font-size:0.8rem; border-radius:8px; flex:1; text-align:center; color:var(--danger); border-color:var(--danger-glow);" onclick="HistoryApp.deleteMatch('${m.id}')">🗑️</button>
                 </div>
@@ -151,15 +152,18 @@ window.HistoryApp = (function() {
         const summary = document.getElementById('report-summary');
         const date = new Date(match.date).toLocaleDateString('pt-BR');
         
-        // Get primary player stats
-        const p1 = match.players[0];
+        // Get global stats
         let totalG = 0, totalP = 0, totalS = 0;
-        match.scores[p1.id].forEach(bArr => {
-            bArr.forEach(s => {
-                const g = typeof s === 'object' ? s.g : s;
-                const p = typeof s === 'object' ? s.p : 0;
-                totalG += g; totalP += p; totalS += (g + p);
-            });
+        match.players.forEach(p => {
+            if(match.scores[p.id]) {
+                match.scores[p.id].forEach(bArr => {
+                    bArr.forEach(s => {
+                        const g = typeof s === 'object' ? s.g : s;
+                        const pScore = typeof s === 'object' ? s.p : 0;
+                        totalG += g; totalP += pScore; totalS += (g + pScore);
+                    });
+                });
+            }
         });
 
         summary.innerHTML = `
@@ -256,10 +260,192 @@ window.HistoryApp = (function() {
         container.innerHTML = html;
     }
 
+    let activeDetailedMatch = null;
+    let detailedMapInstance = null;
+    let detailedMarkers = [];
+    let detailedPolyline = null;
+
+    async function viewDetailedHoleHistory(id) {
+        activeDetailedMatch = await db.getMatch(id);
+        if (!activeDetailedMatch) return;
+
+        document.getElementById('detailed-course-name').innerText = activeDetailedMatch.courseName;
+
+        const scrollContainer = document.getElementById('detailed-holes-scroll');
+        let html = '';
+        const totalHoles = activeDetailedMatch.totalHoles || activeDetailedMatch.physicalHoles;
+        for(let i=1; i<=totalHoles; i++) {
+             html += `<div style="padding:10px 16px; border-radius:12px; background:var(--bg-glass); color:white; font-weight:700; cursor:pointer; flex-shrink:0;" onclick="HistoryApp.renderDetailedHole(${i}, this)">Buraco ${i}</div>`;
+        }
+        scrollContainer.innerHTML = html;
+        
+        app.navigate('view-detailed-history');
+        
+        // Select first hole
+        const firstBtn = scrollContainer.firstChild;
+        if(firstBtn) firstBtn.click();
+    }
+
+    async function renderDetailedHole(holeNum, btnElement) {
+        // Update UI selection
+        const btns = document.getElementById('detailed-holes-scroll').children;
+        for(let b of btns) {
+             b.style.background = 'var(--bg-glass)';
+             b.style.border = 'none';
+        }
+        if(btnElement) {
+            btnElement.style.background = 'var(--accent-primary)';
+            btnElement.style.border = '2px solid #fff';
+        }
+
+        const match = activeDetailedMatch;
+        const physHole = ((holeNum - 1) % match.physicalHoles) + 1;
+        const course = await db.getCourse(match.courseId);
+        const holeData = course?.holes?.find(h => h.number === physHole);
+        
+        const greenCenter = holeData?.points?.greenCenter;
+
+        // Render Map
+        if (!detailedMapInstance) {
+            detailedMapInstance = L.map('detailed-history-map-container', { zoomControl: false }).setView(
+                greenCenter ? [greenCenter.lat, greenCenter.lng] : [-23.5505, -46.6333], 17
+            );
+            L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                maxZoom: 20
+            }).addTo(detailedMapInstance);
+        }
+
+        detailedMarkers.forEach(m => detailedMapInstance.removeLayer(m));
+        if (detailedPolyline) detailedMapInstance.removeLayer(detailedPolyline);
+        detailedMarkers = [];
+        
+        if (greenCenter) {
+            const gm = L.marker([greenCenter.lat, greenCenter.lng], {
+                icon: L.divIcon({ html: `🎯`, iconSize: [24,24], iconAnchor: [12,12] })
+            }).addTo(detailedMapInstance);
+            detailedMarkers.push(gm);
+        }
+
+        const p1 = match.players[0];
+        const validatedShots = (match.validatedShots && match.validatedShots[holeNum]) ? match.validatedShots[holeNum] : [];
+        
+        if (validatedShots.length > 0) {
+            const pts = validatedShots.map(p => [p.lat, p.lng]);
+            if (greenCenter) pts.push([greenCenter.lat, greenCenter.lng]);
+            detailedPolyline = L.polyline(pts, { color: '#F59E0B', weight: 3, dashArray: '5,5', opacity: 0.8 }).addTo(detailedMapInstance);
+            
+            validatedShots.forEach((shot, i) => {
+                const icon = L.divIcon({
+                    className: "wt-shot-pin",
+                    html: `<div style="background:var(--accent-primary);width:24px;height:24px;border-radius:50%;border:2px solid #fff;display:flex;align-items:center;justify-content:center;color:white;font-size:12px;font-weight:bold;">${i+1}</div>`,
+                    iconAnchor: [12, 12]
+                });
+                const m = L.marker([shot.lat, shot.lng], { icon, interactive: false }).addTo(detailedMapInstance);
+                detailedMarkers.push(m);
+            });
+
+            if (pts.length > 0) {
+                detailedMapInstance.fitBounds(detailedPolyline.getBounds(), { padding: [30, 30] });
+            }
+        } else if (greenCenter) {
+            detailedMapInstance.setView([greenCenter.lat, greenCenter.lng], 18);
+        }
+
+        // Render List
+        let listHtml = '';
+        
+        // P1 Details
+        listHtml += `<h3 style="font-size:1rem; color:var(--accent-primary); margin-bottom:12px;">${p1.name} (Jogador Principal)</h3>`;
+        if (validatedShots.length > 0) {
+            listHtml += `<div style="display:flex; flex-direction:column; gap:8px; margin-bottom:24px;">`;
+            validatedShots.forEach((s, idx) => {
+                let distHtml = '--';
+                if (idx < validatedShots.length - 1) {
+                    const nextShot = validatedShots[idx+1];
+                    const latlng1 = L.latLng(s.lat, s.lng);
+                    const latlng2 = L.latLng(nextShot.lat, nextShot.lng);
+                    const yds = Math.round(latlng1.distanceTo(latlng2) * 1.09361);
+                    distHtml = `${yds}y`;
+                } else if (greenCenter) {
+                    const latlng1 = L.latLng(s.lat, s.lng);
+                    const latlng2 = L.latLng(greenCenter.lat, greenCenter.lng);
+                    const yds = Math.round(latlng1.distanceTo(latlng2) * 1.09361);
+                    distHtml = `${yds}y`;
+                }
+
+                const penaltyHtml = s.penalty ? `<span style="background:var(--warning); color:#000; padding:2px 6px; border-radius:4px; font-size:0.6rem; font-weight:bold; margin-left:8px;">PENALIDADE</span>` : '';
+                
+                listHtml += `
+                    <div style="background:var(--bg-primary); border:1px solid var(--border-subtle); border-radius:8px; padding:12px; display:flex; justify-content:space-between; align-items:center;">
+                        <div>
+                            <span style="font-weight:bold; font-size:0.9rem;">Tacada ${idx+1}</span>
+                            <span style="font-size:0.8rem; color:var(--text-secondary); margin-left:8px;">${s.club} (${s.lie})</span>
+                            ${penaltyHtml}
+                        </div>
+                        <div style="font-weight:bold; color:var(--accent-primary);">
+                            ${distHtml}
+                        </div>
+                    </div>
+                `;
+            });
+            listHtml += `</div>`;
+        } else {
+             listHtml += `<p style="font-size:0.8rem; color:var(--text-secondary); margin-bottom:24px;">Tacadas não mapeadas via GPS.</p>`;
+        }
+
+        // Other Players Summary
+        if (match.players.length > 1) {
+             listHtml += `<h3 style="font-size:1rem; color:var(--accent-primary); margin-bottom:12px;">Outros Jogadores</h3>`;
+             match.players.slice(1).forEach(p => {
+                 let playerG = 0, playerP = 0;
+                 if(match.scores[p.id]) {
+                     match.scores[p.id].forEach(bArr => {
+                         const scoreObj = bArr[holeNum-1] || {g:0, p:0};
+                         const g = typeof scoreObj === 'object' ? scoreObj.g : scoreObj;
+                         const pScore = typeof scoreObj === 'object' ? scoreObj.p : 0;
+                         playerG += g; playerP += pScore;
+                     });
+                 }
+                 listHtml += `
+                    <div style="background:var(--bg-primary); border:1px solid var(--border-subtle); border-radius:8px; padding:12px; margin-bottom:8px; display:flex; justify-content:space-between;">
+                        <span style="font-weight:bold;">${p.name}</span>
+                        <span style="font-size:0.9rem; color:var(--text-secondary);">Total: ${playerG + playerP} (Putts: ${playerP})</span>
+                    </div>
+                 `;
+             });
+        }
+        
+        document.getElementById('detailed-hole-info').innerHTML = listHtml;
+
+        setTimeout(() => {
+            if (detailedMapInstance) detailedMapInstance.invalidateSize();
+        }, 100);
+    }
+
+    function shareMatchReport() {
+        const container = document.getElementById('report-scorecard-container');
+        let text = `Relatório de Partida - ${document.getElementById('report-course-name').innerText}\n\n`;
+        
+        // Simples text extraction from scorecard table
+        const rows = container.querySelectorAll('tr');
+        rows.forEach(tr => {
+            let rowData = [];
+            tr.querySelectorAll('th, td').forEach(td => rowData.push(td.innerText));
+            if(rowData.length > 0) text += rowData.join('\t') + '\n';
+        });
+
+        const subject = encodeURIComponent('Meu Relatório de Golfe - Golfly');
+        const body = encodeURIComponent(text);
+        window.location.href = `mailto:?subject=${subject}&body=${body}`;
+    }
+
     return {
         initHistoryView,
         editMatch,
         deleteMatch,
-        viewMatchReport
+        viewMatchReport,
+        viewDetailedHoleHistory,
+        renderDetailedHole,
+        shareMatchReport
     };
 })();

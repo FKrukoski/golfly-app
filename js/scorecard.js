@@ -324,7 +324,8 @@ window.ScorecardApp = (function() {
                  lat: gpsSource.lat,
                  lng: gpsSource.lng,
                  lie: lie,
-                 club: club
+                 club: club,
+                 penalty: false
              });
          }
 
@@ -373,6 +374,9 @@ window.ScorecardApp = (function() {
                  const clubBtn = document.querySelector(`#wt-club-selector .lie-btn[data-club="${shot.club}"]`);
                  if (clubBtn) clubBtn.classList.add('active');
                  
+                 const penaltyToggle = document.getElementById('wt-penalty-toggle');
+                 if (penaltyToggle) penaltyToggle.checked = !!shot.penalty;
+                 
              } else {
                  selectionHint.style.display = 'block';
                  propertiesEditor.style.display = 'none';
@@ -404,6 +408,14 @@ window.ScorecardApp = (function() {
          }
      }
 
+     function toggleWalkthroughPenalty() {
+         if (wtSelectedShotIndex >= 0 && wtSelectedShotIndex < wtActiveShots.length) {
+             const toggle = document.getElementById('wt-penalty-toggle');
+             wtActiveShots[wtSelectedShotIndex].penalty = toggle ? toggle.checked : false;
+             updateWalkthroughUI();
+         }
+     }
+
      function addWalkthroughShot() {
          const lastShot = wtActiveShots.length > 0 ? wtActiveShots[wtActiveShots.length - 1] : { lat: window.GolfMap?.getHoleData()?.greenCenter?.lat || 0, lng: window.GolfMap?.getHoleData()?.greenCenter?.lng || 0 };
          
@@ -412,7 +424,8 @@ window.ScorecardApp = (function() {
              lat: lastShot.lat, 
              lng: lastShot.lng,
              lie: 'fairway',
-             club: '7i'
+             club: '7i',
+             penalty: false
          };
          
          wtActiveShots.push(newShot);
@@ -469,6 +482,7 @@ window.ScorecardApp = (function() {
              lng: s.lng,
              lie: s.lie,
              club: s.club,
+             penalty: s.penalty || false,
              strokeNumber: idx + 1
          }));
 
@@ -572,6 +586,7 @@ window.ScorecardApp = (function() {
          removeWalkthroughShot,
          selectWalkthroughLie,
          selectWalkthroughClub,
+         toggleWalkthroughPenalty,
          deferWalkthrough,
          saveWalkthroughHole
     };

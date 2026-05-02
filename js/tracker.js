@@ -8,15 +8,35 @@ window.ShotTracker = (function() {
     let isTracking = false;
     
     // Configurações de Predição
-    const STOP_THRESHOLD_SPEED = 0.5; // m/s
-    const STOP_TIME_REQUIRED = 30000; // 30 segundos parado para ser candidato
     const MOVEMENT_TO_CONFIRM = 30; // 30 metros de distanciamento para confirmar o candidato anterior
+    const RECENT_LOCATIONS_MAX = 5;
     
     let pathHistory = []; // Array de posições {lat, lng, speed, time}
     let shotCandidates = []; // Pontos onde o usuário parou muito tempo
     
-    let currentStopStartTime = null;
+    let recentLocations = [];
+    let locationIntervalId = null;
     let currentCandidate = null;
+    let lastKnownPos = null;
+
+    document.addEventListener("visibilitychange", () => {
+        if (!document.hidden && isTracking) {
+            registerShotCandidate();
+        }
+    });
+
+    function registerShotCandidate() {
+        if (recentLocations.length === 0) return;
+        
+        let sumLat = 0, sumLng = 0;
+        recentLocations.forEach(p => { sumLat += p.lat; sumLng += p.lng; });
+        const avgLat = sumLat / recentLocations.length;
+        const avgLng = sumLng / recentLocations.length;
+        
+        const time = Date.now();
+        currentCandidate = { lat: avgLat, lng: avgLng, time: time, confirmed: false };
+        console.log("Candidato a tacada detectado pelo visor!", currentCandidate);
+    }
 
     async function requestWakeLock() {
         if ('wakeLock' in navigator) {
@@ -52,8 +72,18 @@ window.ShotTracker = (function() {
 
         pathHistory = [];
         shotCandidates = [];
-        currentStopStartTime = null;
+        recentLocations = [];
+        lastKnownPos = null;
         currentCandidate = null;
+        
+        locationIntervalId = setInterval(() => {
+            if (lastKnownPos) {
+                recentLocations.push(lastKnownPos);
+                if (recentLocations.length > RECENT_LOCATIONS_MAX) {
+                    recentLocations.shift();
+                }
+            }
+        }, 5000);
         
         requestWakeLock();
 
@@ -74,6 +104,10 @@ window.ShotTracker = (function() {
         if (watchId !== null) {
             navigator.geolocation.clearWatch(watchId);
             watchId = null;
+        }
+        if (locationIntervalId) {
+            clearInterval(locationIntervalId);
+            locationIntervalId = null;
         }
         releaseWakeLock();
         isTracking = false;
@@ -97,37 +131,17 @@ window.ShotTracker = (function() {
         const speed = pos.coords.speed || 0; // m/s (pode ser null)
         const time = pos.timestamp;
 
-        // Se speed do GPS vier null, podemos calcular manually se necessário, mas para MVP vamos usar o speed nativo e fallback simples.
-        
+        lastKnownPos = { lat, lng, speed, time };
         pathHistory.push({ lat, lng, speed, time });
 
-        // 1. Lógica de Parada (Identificar Candidato a Tacada)
-        if (speed < STOP_THRESHOLD_SPEED) {
-            if (!currentStopStartTime) {
-                currentStopStartTime = time;
-            } else {
-                const stoppedFor = time - currentStopStartTime;
-                if (stoppedFor >= STOP_TIME_REQUIRED) {
-                    // Parou por 30s. Potencial tacada.
-                    if (!currentCandidate) {
-                        currentCandidate = { lat, lng, time, confirmed: false };
-                        console.log("Candidato a tacada detectado!", currentCandidate);
-                    }
-                }
-            }
-        } else {
-            // Em movimento.
-            currentStopStartTime = null;
-
-            // 2. Lógica de Confirmação (Distanciou-se do candidato?)
-            if (currentCandidate && !currentCandidate.confirmed) {
-                const dist = getDistance(currentCandidate.lat, currentCandidate.lng, lat, lng);
-                if (dist > MOVEMENT_TO_CONFIRM) {
-                    currentCandidate.confirmed = true;
-                    shotCandidates.push(currentCandidate);
-                    console.log("Tacada anterior confirmada! (distanciamento detectado)");
-                    currentCandidate = null; // Zera para a próxima
-                }
+        // Lógica de Confirmação (Distanciou-se do candidato?)
+        if (currentCandidate && !currentCandidate.confirmed) {
+            const dist = getDistance(currentCandidate.lat, currentCandidate.lng, lat, lng);
+            if (dist > MOVEMENT_TO_CONFIRM) {
+                currentCandidate.confirmed = true;
+                shotCandidates.push(currentCandidate);
+                console.log("Tacada anterior confirmada! (distanciamento detectado)");
+                currentCandidate = null; // Zera para a próxima
             }
         }
     }
