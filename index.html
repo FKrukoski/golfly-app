@@ -128,6 +128,17 @@
                     <button class="icon-btn back-btn" onclick="app.navigate('view-home')">⬅</button>
                     <h2>Meus Campos</h2>
                 </div>
+                
+                <div id="course-list-progress-container" style="display:none; margin: 0 24px 16px;">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:0.7rem; color:var(--text-secondary);">
+                        <span>Baixando Satélite...</span>
+                        <span id="course-list-progress-percent">0%</span>
+                    </div>
+                    <div style="width:100%; height:6px; background:var(--bg-secondary); border-radius:3px; overflow:hidden;">
+                        <div id="course-list-progress-bar" style="width:0%; height:100%; background:var(--accent-primary); transition:width 0.3s ease;"></div>
+                    </div>
+                </div>
+
                 <div class="list-container" id="courses-list">
                     <!-- Dynamic List -->
                 </div>
@@ -179,20 +190,6 @@
                     <button class="primary-card" id="btn-save-progress" style="width:100%; text-align:center; background:var(--accent-primary); color:#fff;" onclick="app.saveMappingProgress()">
                         Salvar BURACO e Avançar
                     </button>
-
-                    <button class="secondary-card" id="btn-download-map" style="width:100%; text-align:center; margin-top:12px; font-size:0.9rem;" onclick="app.downloadOfflineMap()">
-                        📥 Baixar Mapa Offline do Campo
-                    </button>
-                    
-                    <div id="map-progress-container" style="display:none; margin-top:12px;">
-                        <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:0.7rem; color:var(--text-secondary);">
-                            <span>Baixando Satélite...</span>
-                            <span id="map-progress-percent">0%</span>
-                        </div>
-                        <div style="width:100%; height:6px; background:var(--bg-primary); border-radius:3px; overflow:hidden;">
-                            <div id="map-progress-bar" style="width:0%; height:100%; background:var(--accent-primary); transition:width 0.3s ease;"></div>
-                        </div>
-                    </div>
                 </div>
             </section>
             
@@ -385,7 +382,8 @@
             </section>
 
             <!-- Detailed Hole History -->
-            <section id="view-detailed-history" class="view hidden" style="height: 100vh; position: absolute; top:0; left:0; width:100%; z-index:2000; background:var(--bg-primary); display:flex; flex-direction:column;">
+            <section id="view-detailed-history" class="view hidden" style="height: 100vh; position: absolute; top:0; left:0; width:100%; z-index:2000; background:var(--bg-primary);">
+              <div style="display:flex; flex-direction:column; height:100%;">
                 <div class="view-header" style="background:var(--bg-glass); backdrop-filter:blur(8px); padding:16px 24px; flex-shrink:0;">
                     <button class="icon-btn back-btn" onclick="app.navigate('view-history')">⬅</button>
                     <div>
@@ -404,6 +402,7 @@
                 <div id="detailed-hole-info" style="flex:1; overflow-y:auto; padding:16px 24px; background:var(--bg-secondary); border-top-left-radius:24px; border-top-right-radius:24px; box-shadow:0 -4px 24px rgba(0,0,0,0.5);">
                     <!-- Shots list injected here -->
                 </div>
+              </div>
             </section>
 
         </main>

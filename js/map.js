@@ -217,7 +217,17 @@ window.GolfMap = (function() {
     }
 
     function updateUserLocation(lat, lng) {
-         const latlng = [lat, lng];
+         let latlng = [lat, lng];
+         
+         // Se estiver simulando a partida (muito longe do green, > 2km), forçar o userLocation para ser um Tee simulado (300y abaixo do green).
+         if (scorecardGreenCenter && typeof L !== 'undefined') {
+             const distToGreen = L.latLng(lat, lng).distanceTo(scorecardGreenCenter);
+             if (distToGreen > 2000) {
+                 // Fake Tee 300 meters south
+                 latlng = [scorecardGreenCenter.lat - 0.003, scorecardGreenCenter.lng];
+             }
+         }
+
          userLocation = latlng;
          
          if (markers['user']) mapInstance.removeLayer(markers['user']);
@@ -228,8 +238,12 @@ window.GolfMap = (function() {
              iconAnchor: [8, 8]
          });
          
-         markers['user'] = L.marker(latlng, { icon: userIcon }).addTo(mapInstance);
+         markers['user'] = L.marker(userLocation, { icon: userIcon }).addTo(mapInstance);
          updateDistanceHUD();
+    }
+    
+    function getUserLocation() {
+        return userLocation;
     }
 
     function centerOnUser() {
@@ -537,6 +551,7 @@ window.GolfMap = (function() {
         initWalkthroughMap,
         refreshWalkthroughMarkers,
         selectWalkthroughMarker,
-        getWalkthroughShotsArray
+        getWalkthroughShotsArray,
+        getUserLocation
     };
 })();

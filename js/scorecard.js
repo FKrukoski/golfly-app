@@ -314,6 +314,10 @@ window.ScorecardApp = (function() {
          for (let i = 0; i < wtTotalScore; i++) {
              let gpsSource = gpsShots[i];
              if (!gpsSource && i > 0) gpsSource = wtActiveShots[i-1]; // Fallback to previous
+             if (!gpsSource && i === 0 && window.GolfMap && window.GolfMap.getUserLocation) {
+                 const uLoc = window.GolfMap.getUserLocation();
+                 if (uLoc) gpsSource = { lat: uLoc[0], lng: uLoc[1] };
+             }
              if (!gpsSource) gpsSource = { lat: window.GolfMap?.getHoleData()?.greenCenter?.lat || 0, lng: window.GolfMap?.getHoleData()?.greenCenter?.lng || 0 };
              
              let lie = i === 0 ? 'tee' : (i >= wtTotalScore - scoreObj.p ? 'green' : 'fairway');
@@ -417,7 +421,17 @@ window.ScorecardApp = (function() {
      }
 
      function addWalkthroughShot() {
-         const lastShot = wtActiveShots.length > 0 ? wtActiveShots[wtActiveShots.length - 1] : { lat: window.GolfMap?.getHoleData()?.greenCenter?.lat || 0, lng: window.GolfMap?.getHoleData()?.greenCenter?.lng || 0 };
+         let lastShot = null;
+         if (wtActiveShots.length > 0) {
+             lastShot = wtActiveShots[wtActiveShots.length - 1];
+         } else if (window.GolfMap && window.GolfMap.getUserLocation) {
+             const uLoc = window.GolfMap.getUserLocation();
+             if (uLoc) lastShot = { lat: uLoc[0], lng: uLoc[1] };
+         }
+         
+         if (!lastShot) {
+             lastShot = { lat: window.GolfMap?.getHoleData()?.greenCenter?.lat || 0, lng: window.GolfMap?.getHoleData()?.greenCenter?.lng || 0 };
+         }
          
          const newShot = {
              id: 'shot_' + Date.now(),

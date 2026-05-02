@@ -166,6 +166,31 @@ const app = (function() {
             return;
         }
 
+        // Sort by distance
+        let userPos = null;
+        try {
+            userPos = await new Promise((resolve) => {
+                navigator.geolocation.getCurrentPosition(
+                    (pos) => resolve({lat: pos.coords.latitude, lng: pos.coords.longitude}),
+                    (err) => resolve(null),
+                    { timeout: 3000, maximumAge: 60000 }
+                );
+            });
+        } catch(e) {}
+
+        if (userPos && typeof L !== 'undefined') {
+            const uLatLng = L.latLng(userPos.lat, userPos.lng);
+            courses.forEach(c => {
+                if (c.holes && c.holes.length > 0 && c.holes[0].points && c.holes[0].points.greenCenter) {
+                    const g = c.holes[0].points.greenCenter;
+                    c._distance = uLatLng.distanceTo(L.latLng(g.lat, g.lng));
+                } else {
+                    c._distance = Infinity;
+                }
+            });
+            courses.sort((a, b) => (a._distance || 0) - (b._distance || 0));
+        }
+
         const isAdmin = window.AuthApp.isAdmin();
         listContainer.innerHTML = courses.map(c => `
              <div class="secondary-card" style="margin-bottom:12px; display:flex; flex-direction:column; gap:8px;">
@@ -173,12 +198,16 @@ const app = (function() {
                        <div>
                            <h3 style="font-size:1.1rem;margin-bottom:4px;">${c.name}</h3>
                            <p style="font-size:0.8rem;color:var(--text-secondary);">${c.city || 'S/ Cidade'} • Par ${c.totalPar || '--'} • ${c.holes ? c.holes.length : 0} Buracos</p>
+                           ${c._distance && c._distance !== Infinity ? `<p style="font-size:0.75rem;color:var(--accent-primary);margin-top:2px;">📍 A ${Math.round(c._distance / 1000)} km de distância</p>` : ''}
                        </div>
                        ${isAdmin ? `<button class="icon-btn" style="color:var(--danger);font-size:1.2rem;" onclick="app.deleteCourseUi('${c.id}')">🗑️</button>` : ''}
                   </div>
                   <div style="display:flex; gap:8px;">
-                       <button class="primary-card" style="flex:1; padding:10px;text-align:center;font-size:0.9rem;" onclick="ScorecardApp.initNewMatchView('${c.id}')">
-                            🏁 Iniciar Partida
+                       <button class="primary-card" style="flex:2; padding:10px;text-align:center;font-size:0.9rem;" onclick="ScorecardApp.initNewMatchView('${c.id}')">
+                            🏁 Jogar
+                       </button>
+                       <button class="secondary-card" style="flex:1.5; padding:10px;text-align:center;font-size:0.9rem;" onclick="app.downloadOfflineMap('${c.id}')">
+                            📥 Mapa
                        </button>
                        ${isAdmin ? `
                             <button class="secondary-card" style="flex:1; padding:10px;text-align:center;font-size:0.9rem;" onclick="app.resumeCourseMapping('${c.id}')">
@@ -454,33 +483,61 @@ const app = (function() {
          }
     }
 
-    async function downloadOfflineMap() {
-        if (!activeMappingCourse || !activeMappingCourse.holes) return;
-        const bounds = window.GolfMap.getCourseBounds(activeMappingCourse.holes);
-        if (!bounds) return;
-        const progressContainer = document.getElementById('map-progress-container');
-        const progressBar = document.getElementById('map-progress-bar');
-        const progressPercent = document.getElementById('map-progress-percent');
-        progressContainer.style.display = 'block'; progressBar.style.width = '0%'; progressPercent.innerText = '0%';
+    async function downloadOfflineMap(courseId) {
+        let courseToDownload = activeMappingCourse;
+        if (courseId) courseToDownload = await db.getCourse(courseId);
+        
+        if (!courseToDownload || !courseToDownload.holes) return;
+        const bounds = window.GolfMap.getCourseBounds(courseToDownload.holes);
+        if (!bounds) { alert("Nenhum buraco mapeado neste campo."); return; }
+        
+        const progressContainer = document.getElementById('course-list-progress-container');
+        const progressBar = document.getElementById('course-list-progress-bar');
+        const progressPercent = document.getElementById('course-list-progress-percent');
+        
+        const container = progressContainer || document.getElementById('map-progress-container');
+        const bar = progressBar || document.getElementById('map-progress-bar');
+        const percent = progressPercent || document.getElementById('map-progress-percent');
+
+        if (container) container.style.display = 'block'; 
+        if (bar) bar.style.width = '0%'; 
+        if (percent) percent.innerText = '0%';
+        
         const staticUrl = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/export?bbox=${bounds[0][1]},${bounds[0][0]},${bounds[1][1]},${bounds[1][0]}&bboxSR=4326&size=1024,1024&format=png&f=image`;
         let progress = 0;
         const interval = setInterval(() => {
             if (progress < 90) {
                 progress += Math.random() * 15; if (progress > 90) progress = 90;
-                progressBar.style.width = `${Math.round(progress)}%`; progressPercent.innerText = `${Math.round(progress)}%`;
+                if (bar) bar.style.width = `${Math.round(progress)}%`; 
+                if (percent) percent.innerText = `${Math.round(progress)}%`;
             }
         }, 300);
+        
         try {
-            const resp = await fetch(staticUrl); if (!resp.ok) throw new Error("Download failed");
-            const blob = await resp.blob(); const reader = new FileReader();
+            const resp = await fetch(staticUrl); 
+            if (!resp.ok) throw new Error("Download failed");
+            const blob = await resp.blob(); 
+            const reader = new FileReader();
+            
             reader.onloadend = async () => {
-                clearInterval(interval); progressBar.style.width = '100%'; progressPercent.innerText = '100%';
-                activeMappingCourse.offlineMap = { image: reader.result, bounds: bounds };
-                await db.saveCourse(activeMappingCourse);
-                setTimeout(() => { alert("Mapa Offline Salvo!"); progressContainer.style.display = 'none'; }, 500);
+                clearInterval(interval); 
+                if (bar) bar.style.width = '100%'; 
+                if (percent) percent.innerText = '100%';
+                
+                courseToDownload.offlineMap = { image: reader.result, bounds: bounds };
+                await db.saveCourse(courseToDownload);
+                
+                setTimeout(() => { 
+                    alert("Mapa Offline Salvo com sucesso!"); 
+                    if (container) container.style.display = 'none'; 
+                }, 500);
             };
             reader.readAsDataURL(blob);
-        } catch(e) { clearInterval(interval); progressContainer.style.display = 'none'; alert("Erro ao baixar mapa."); }
+        } catch(e) {
+            clearInterval(interval); 
+            if (container) container.style.display = 'none'; 
+            alert("Erro ao baixar mapa.");
+        }
     }
 
     async function submitRequest(type) {
