@@ -142,9 +142,12 @@ window.HistoryApp = (function() {
         }
     }
 
+    let currentReportMatch = null;
+
     async function viewMatchReport(id) {
         const match = await db.getMatch(id);
         if (!match) return;
+        currentReportMatch = match;
 
         document.getElementById('report-course-name').innerText = match.courseName;
         
@@ -422,19 +425,79 @@ window.HistoryApp = (function() {
         }, 100);
     }
 
-    function shareMatchReport() {
-        const container = document.getElementById('report-scorecard-container');
-        let text = `Relatório de Partida - ${document.getElementById('report-course-name').innerText}\n\n`;
+    async function shareMatchReport() {
+        if (!currentReportMatch) return;
+        const match = currentReportMatch;
+        const course = await db.getCourse(match.courseId);
         
-        // Simples text extraction from scorecard table
-        const rows = container.querySelectorAll('tr');
-        rows.forEach(tr => {
-            let rowData = [];
-            tr.querySelectorAll('th, td').forEach(td => rowData.push(td.innerText));
-            if(rowData.length > 0) text += rowData.join('\t') + '\n';
+        const date = new Date(match.date).toLocaleDateString('pt-BR');
+        let text = match.advancedTracking ? `Relatório de Partida Avançado - ${match.courseName}\n` : `Relatório de Partida - ${match.courseName}\n`;
+        text += `Data: ${date}\n\n`;
+
+        match.players.forEach(p => {
+            text += `Jogador: ${p.name}\n`;
+            if (match.advancedTracking) {
+                text += `-------------------------------------------------------------------------------------------------\n`;
+                text += `Bur | Par | Grn | Pts | Tot || TSPDEsp | TSFPen | APFacil | W10to20 | 3Put | 1Put2GO\n`;
+            } else {
+                text += `-----------------------------------\n`;
+                text += `Buraco | Par | Green | Putts | Total\n`;
+            }
+
+            for (let b = 0; b < match.ballsMultiplier; b++) {
+                if (match.ballsMultiplier > 1) {
+                    text += `BOLA ${b+1}\n`;
+                }
+
+                let ballTotalG = 0, ballTotalP = 0, ballTotalT = 0, ballTotalPar = 0;
+
+                match.scores[p.id][b].forEach((s, idx) => {
+                    const physHole = (idx % match.physicalHoles) + 1;
+                    const holeData = course?.holes?.find(h => h.number === physHole);
+                    const par = holeData?.par || 4;
+                    
+                    const g = typeof s === 'object' ? s.g : s;
+                    const pScore = typeof s === 'object' ? s.p : 0;
+                    const total = g + pScore;
+                    
+                    ballTotalG += g; ballTotalP += pScore; ballTotalT += total; ballTotalPar += par;
+
+                    const burStr = String(idx + 1).padStart(match.advancedTracking ? 3 : 6, ' ');
+                    const parStr = String(par).padStart(match.advancedTracking ? 3 : 3, ' ');
+                    const grnStr = String(g).padStart(match.advancedTracking ? 3 : 5, ' ');
+                    const ptsStr = String(pScore).padStart(match.advancedTracking ? 3 : 5, ' ');
+                    const totStr = String(total).padStart(match.advancedTracking ? 3 : 5, ' ');
+
+                    if (match.advancedTracking) {
+                        const advData = match.advancedData ? match.advancedData[idx] : null;
+                        const v1 = advData && advData['TSPDEsp'] ? advData['TSPDEsp'] : '-';
+                        const v2 = advData && advData['TSFPen'] ? advData['TSFPen'] : '-';
+                        const v3 = advData && advData['APFacil'] ? advData['APFacil'] : '-';
+                        const v4 = advData && advData['W10to20'] ? advData['W10to20'] : '-';
+                        const v5 = advData && advData['3Put'] ? advData['3Put'] : '-';
+                        const v6 = advData && advData['1Put2GO'] ? advData['1Put2GO'] : '-';
+
+                        text += `${burStr} | ${parStr} | ${grnStr} | ${ptsStr} | ${totStr} ||    ${v1}    |   ${v2}    |    ${v3}    |    ${v4}    |  ${v5}   |    ${v6}\n`;
+                    } else {
+                        text += `${burStr} | ${parStr} | ${grnStr} | ${ptsStr} | ${totStr}\n`;
+                    }
+                });
+
+                if (match.advancedTracking) {
+                    text += `-------------------------------------------------------------------------------------------------\n`;
+                    text += `TOT | ${String(ballTotalPar).padStart(3, ' ')} |  -- | ${String(ballTotalP).padStart(3, ' ')} | ${String(ballTotalT).padStart(3, ' ')}\n\n`;
+                } else {
+                    text += `-----------------------------------\n`;
+                    text += `TOTAL  | ${String(ballTotalPar).padStart(3, ' ')} |  --   | ${String(ballTotalP).padStart(3, ' ')} | ${String(ballTotalT).padStart(3, ' ')}\n\n`;
+                }
+            }
         });
 
-        const subject = encodeURIComponent('Meu Relatório de Golfe - Golfly');
+        if (match.advancedTracking) {
+             text += `*(Legenda das estatísticas: TSPDEsp = Tee Shot Perto da Distância Esp.; TSFPen = Tee Shot Fora de Penalidades; APFacil = Approach Perto/Fácil; W10to20 = Wedge 10-20 pés; 3Put = Three Putts; 1Put2GO = Um put <10 pés).*\n`;
+        }
+
+        const subject = encodeURIComponent(`Meu Relatório de Golfe - ${match.courseName}`);
         const body = encodeURIComponent(text);
         window.location.href = `mailto:?subject=${subject}&body=${body}`;
     }

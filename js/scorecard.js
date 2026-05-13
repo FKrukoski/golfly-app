@@ -90,6 +90,10 @@ window.ScorecardApp = (function() {
          const ballsMultiplier = parseInt(document.getElementById('match-balls-multiplier').value, 10) || 1;
          const rounds = parseInt(document.getElementById('match-rounds').value, 10) || 1;
 
+         const advancedTracking = document.getElementById('match-advanced-tracking')?.checked || false;
+         const isAdvancedEligible = ballsMultiplier === 1 && rounds === 1;
+         const finalAdvancedTracking = advancedTracking && isAdvancedEligible;
+
          // Initialize match state (physical holes dictates UI loop)
          const physicalHoles = course.physicalHoles || 18;
          const totalHoles = physicalHoles * rounds;
@@ -114,6 +118,8 @@ window.ScorecardApp = (function() {
              physicalHoles: physicalHoles,
              totalHoles: totalHoles,
              scores: scores,
+             advancedTracking: finalAdvancedTracking,
+             advancedData: finalAdvancedTracking ? Array.from({length: totalHoles}, () => ({})) : null,
              currentHole: 1
          };
 
@@ -146,6 +152,7 @@ window.ScorecardApp = (function() {
           }
 
           renderScoreCounters();
+          renderAdvancedTracking();
           app.navigate('view-scorecard');
     }
 
@@ -230,6 +237,62 @@ window.ScorecardApp = (function() {
               </div>
               `;
           }).join('');
+     }
+
+     function renderAdvancedTracking() {
+         const container = document.getElementById('advanced-tracking-container');
+         const form = document.getElementById('advanced-tracking-form');
+         
+         if (!activeMatchState.advancedTracking) {
+             if (container) container.style.display = 'none';
+             return;
+         }
+         
+         if (container) container.style.display = 'flex';
+         
+         const holeIdx = activeMatchState.currentHole - 1;
+         const data = activeMatchState.advancedData[holeIdx] || {};
+         
+         const questions = [
+             { id: 'TSPDEsp', label: 'Tee shot perto da distância esperada?' },
+             { id: 'TSFPen', label: 'Tee shot fora de penalidades?' },
+             { id: 'APFacil', label: 'Approach: GIR ou perto e fácil?' },
+             { id: 'W10to20', label: 'Wedge shot: 10 a 20 pés?' },
+             { id: '3Put', label: 'Three putts?' },
+             { id: '1Put2GO', label: 'Um put abaixo de 10 pés?' }
+         ];
+         
+         form.innerHTML = questions.map(q => {
+             const val = data[q.id];
+             const yesStyle = val === 'S' ? 'background:var(--accent-primary); color:white; border-color:var(--accent-primary);' : 'background:transparent; color:white; border-color:var(--border-subtle);';
+             const noStyle = val === 'N' ? 'background:var(--danger); color:white; border-color:var(--danger);' : 'background:transparent; color:white; border-color:var(--border-subtle);';
+             
+             return `
+                 <div style="display:flex; justify-content:space-between; align-items:center;">
+                     <span style="font-size:0.85rem; flex:1;">${q.label}</span>
+                     <div style="display:flex; gap:8px;">
+                         <button class="secondary-card" style="padding:6px 12px; font-size:0.8rem; border-radius:8px; ${yesStyle}" onclick="ScorecardApp.updateAdvancedTracking('${q.id}', 'S')">Sim</button>
+                         <button class="secondary-card" style="padding:6px 12px; font-size:0.8rem; border-radius:8px; ${noStyle}" onclick="ScorecardApp.updateAdvancedTracking('${q.id}', 'N')">Não</button>
+                     </div>
+                 </div>
+             `;
+         }).join('');
+     }
+
+     async function updateAdvancedTracking(field, value) {
+         const holeIdx = activeMatchState.currentHole - 1;
+         if (!activeMatchState.advancedData[holeIdx]) {
+             activeMatchState.advancedData[holeIdx] = {};
+         }
+         
+         if (activeMatchState.advancedData[holeIdx][field] === value) {
+             delete activeMatchState.advancedData[holeIdx][field];
+         } else {
+             activeMatchState.advancedData[holeIdx][field] = value;
+         }
+         
+         await db.setActiveMatch(activeMatchState);
+         renderAdvancedTracking();
      }
 
     async function updateScore(playerId, ballIdx, delta, type = 'g') {
@@ -602,6 +665,7 @@ window.ScorecardApp = (function() {
          selectWalkthroughClub,
          toggleWalkthroughPenalty,
          deferWalkthrough,
-         saveWalkthroughHole
+         saveWalkthroughHole,
+         updateAdvancedTracking
     };
 })();

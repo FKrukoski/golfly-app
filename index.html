@@ -223,6 +223,11 @@
                         </div>
                     </div>
 
+                    <div id="advanced-tracking-setup" style="margin-top:16px; padding:12px; background:var(--bg-secondary); border-radius:12px; border:1px solid var(--border-subtle); display:flex; align-items:center; gap:12px;">
+                        <input type="checkbox" id="match-advanced-tracking" style="width:24px; height:24px; accent-color:var(--accent-primary);">
+                        <label for="match-advanced-tracking" style="font-size:0.9rem; color:var(--text-primary); cursor:pointer;">Acompanhamento Avançado de Tacadas (Apenas para 1 Bola)</label>
+                    </div>
+
                     <div class="form-group" style="margin-top:16px;">
                         <label>Jogadores no Flight</label>
                         <div id="players-list" style="display:flex;flex-direction:column;gap:8px;margin-top:12px;"></div>
@@ -273,6 +278,13 @@
 
                 <div id="scorecard-players-container" style="display:flex;flex-direction:column;gap:16px;margin-bottom:32px;">
                     <!-- Players Score UI will be injected here -->
+                </div>
+
+                <div id="advanced-tracking-container" style="display:none; flex-direction:column; gap:12px; margin-bottom:24px; padding:16px; background:var(--bg-primary); border-radius:12px; border:1px solid var(--border-subtle);">
+                    <h3 style="font-size:1rem; color:var(--accent-primary); margin-bottom:4px;">Estatísticas Avançadas</h3>
+                    <div id="advanced-tracking-form" style="display:flex; flex-direction:column; gap:16px;">
+                        <!-- Injected by JS -->
+                    </div>
                 </div>
 
                 <div style="margin-bottom:16px;">

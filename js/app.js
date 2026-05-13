@@ -116,22 +116,36 @@ const app = (function() {
         const activeMatches = await db.getAllActiveMatches();
         
         if (activeMatches.length > 0) {
-            container.innerHTML = activeMatches.map(m => `
-                <div class="primary-card" style="background:linear-gradient(135deg, var(--bg-secondary), var(--accent-glow)); border-color:var(--accent-primary);" onclick="ScorecardApp.resumeActive('${m.id}')">
+            container.innerHTML = activeMatches.map(m => {
+                const startDate = m.date ? new Date(m.date).toLocaleString('pt-BR', {day: '2-digit', month: '2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'}) : '';
+                return `
+                <div class="primary-card" style="background:linear-gradient(135deg, var(--bg-secondary), var(--accent-glow)); border-color:var(--accent-primary);">
                     <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <div style="text-align:left;">
+                        <div style="text-align:left; cursor:pointer; flex:1;" onclick="ScorecardApp.resumeActive('${m.id}')">
                             <h3 style="font-size:1.2rem; margin-bottom:4px;">${m.courseName || 'Partida Ativa'}</h3>
                             <p style="color:var(--text-primary); font-size:0.9rem;">Buraco ${m.currentHole || 1} • Em Progresso</p>
+                            ${startDate ? `<p style="color:var(--text-secondary); font-size:0.75rem; margin-top:4px;">Iniciada em ${startDate}</p>` : ''}
                         </div>
-                        <button class="icon-btn" style="background:var(--accent-primary); border-radius:12px; padding:8px 16px; color:white; font-weight:700; width:auto; height:auto; font-size:0.8rem;">RETOMAR</button>
+                        <div style="display:flex; gap:8px; align-items:center;">
+                            <button class="icon-btn" style="background:var(--accent-primary); border-radius:12px; padding:8px 16px; color:white; font-weight:700; width:auto; height:auto; font-size:0.8rem;" onclick="ScorecardApp.resumeActive('${m.id}')">RETOMAR</button>
+                            <button class="icon-btn" style="background:transparent; border:1px solid var(--danger); border-radius:12px; padding:8px; color:var(--danger); font-size:1rem;" onclick="app.deleteActiveMatchUi('${m.id}')">🗑️</button>
+                        </div>
                     </div>
                 </div>
-            `).join('');
+                `;
+            }).join('');
             container.style.display = 'flex';
         } else {
             container.style.display = 'none';
             container.innerHTML = '';
         }
+    }
+
+    async function deleteActiveMatchUi(id) {
+         if (confirm('Tem certeza que deseja apagar esta partida em andamento? Ela não será salva no histórico.')) {
+              await db.clearActiveMatch(id);
+              renderActiveMatches();
+         }
     }
 
     function toggleSidebar() {
@@ -584,7 +598,7 @@ const app = (function() {
     return {
         init, navigate, startCourseMapping, resumeCourseMapping, deleteCourseUi, switchMapperHole, saveMappingProgress,
         cancelMapping, applyManualCoords, handleCsvUpload, setManualPar, processAuth, toggleSidebar, downloadOfflineMap,
-        installPwa, submitRequest, handleApproval, renderActiveMatches
+        installPwa, submitRequest, handleApproval, renderActiveMatches, deleteActiveMatchUi
     };
 })();
 
